@@ -9,7 +9,7 @@
 
 html, body {
     height: 100%;
-    overflow: hidden; /* Отключаем скролл на уровне документа */
+    overflow: hidden;
 }
 
 body {
@@ -131,7 +131,7 @@ body {
     display: flex;
     gap: 8px;
     flex: 1;
-    min-height: 0; /* Важно для flex-контейнера */
+    min-height: 0;
     overflow: hidden;
 }
 
@@ -141,7 +141,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    min-width: 0; /* Предотвращает переполнение */
+    min-width: 0;
     overflow: hidden;
 }
 
@@ -336,16 +336,13 @@ body {
     box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
 }
 
-#example-right.unknown {
+#example-right.unknown,
+#example-left.unknown,
+#example-result.unknown {
     background: #ffd700;
     animation: pulse-gentle 1.5s infinite;
     border: 3px dashed #ff6b6b;
-}
-
-#example-left.unknown, #example-result.unknown {
-    background: #ffd700;
-    animation: pulse-gentle 1.5s infinite;
-    border: 3px dashed #ff6b6b;
+    cursor: copy;
 }
 
 .example-instruction {
@@ -365,27 +362,6 @@ body {
     0% { transform: scale(1); }
     50% { transform: scale(1.05); background: #ffed8a; }
     100% { transform: scale(1); }
-}
-
-/* Скрываем домик когда показываем пример */
-.house-container.hidden {
-    display: none;
-}
-
-/* Адаптация для маленьких экранов */
-@media (max-width: 480px) {
-    .example-box {
-        font-size: 15vw;
-        padding: 15px 10px;
-    }
-
-    .example-box span {
-        min-width: 40px;
-    }
-
-    .example-instruction {
-        font-size: 4.5vw;
-    }
 }
 
 /* ========== КОЛОНКА С ЦИФРАМИ (ВЕРТИКАЛЬНАЯ) ========== */
@@ -420,6 +396,10 @@ body {
     transition: all 0.2s ease;
     flex-shrink: 0;
     margin: 0 auto;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: pan-y pinch-zoom;
 }
 
 .digit-item:active {
@@ -428,42 +408,53 @@ body {
     box-shadow: 0 1px 0 #ddd;
 }
 
-.digit-item.ui-draggable-dragging {
-    transform: scale(1.1);
-    box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-    opacity: 0.9;
-    z-index: 1000;
-    width: 60px !important;
-    height: 60px !important;
-    font-size: 8vw !important;
+.digit-item.dragging {
+    opacity: 0.2 !important;
+    transform: scale(0.8) !important;
+    filter: blur(1px);
+    transition: all 0.3s ease;
+}
+
+/* ========== КЛОН ПЕРЕТАСКИВАЕМОЙ ЦИФРЫ ========== */
+.digit-clone {
+    position: fixed;
+    width: 70px;
+    height: 70px;
     background: #4caf50;
     color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    font-weight: bold;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+    border: 3px solid white;
+    z-index: 10000;
+    pointer-events: none;
+    transform-origin: center center;
+    will-change: left, top, transform;
+    touch-action: none;
+    filter: drop-shadow(0 10px 15px rgba(0,0,0,0.3));
+    animation: float 1s infinite ease-in-out;
 }
 
-/* Помощник при перетаскивании */
-.digit-helper {
-    width: 60px !important;
-    height: 60px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    background: #4caf50 !important;
-    color: white !important;
-    border-radius: 50% !important;
-    font-size: 8vw !important;
-    font-weight: bold !important;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.4) !important;
-    border: 3px solid white !important;
-    position: fixed !important;
-    z-index: 1000 !important;
-    pointer-events: none !important;
-    animation: pulse 1s infinite;
+.digit-clone::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), transparent);
+    pointer-events: none;
 }
 
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); }
+@keyframes float {
+    0% { transform: scale(1.1) translateY(0); }
+    50% { transform: scale(1.15) translateY(-5px); }
+    100% { transform: scale(1.1) translateY(0); }
 }
 
 /* ========== КНОПКИ ДЕЙСТВИЙ ========== */
@@ -622,6 +613,49 @@ body {
     font-size: 3vw;
 }
 
+@keyframes bounceIn {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.05); }
+    70% { transform: scale(0.9); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* ========== СТИЛИ ДЛЯ DRAG AND DROP ========== */
+.drop-target-active {
+    position: relative;
+    animation: targetGlow 1.5s infinite;
+}
+
+@keyframes targetGlow {
+    0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+    50% { box-shadow: 0 0 20px 10px rgba(76, 175, 80, 0.3); }
+    100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+}
+
+.drop-target-highlight {
+    transform: scale(1.08) !important;
+    background: rgba(76, 175, 80, 0.4) !important;
+    border: 4px solid #4caf50 !important;
+    box-shadow: 0 0 30px #4caf50 !important;
+    transition: all 0.15s ease;
+    z-index: 100;
+}
+
+.drop-success {
+    animation: dropSuccess 0.3s ease;
+}
+
+@keyframes dropSuccess {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); background: #4caf50; color: white; }
+    100% { transform: scale(1); }
+}
+
 /* ========== АДАПТАЦИЯ ДЛЯ РАЗНЫХ ЭКРАНОВ ========== */
 @media (min-width: 600px) {
     .digits-column {
@@ -648,6 +682,23 @@ body {
     }
 }
 
+@media (pointer: coarse) {
+    .digit-item {
+        min-height: 70px;
+    }
+
+    .digit-clone {
+        width: 85px !important;
+        height: 85px !important;
+        font-size: 50px !important;
+        box-shadow: 0 20px 30px rgba(0,0,0,0.5) !important;
+    }
+
+    .drop-target-highlight {
+        transform: scale(1.1) !important;
+    }
+}
+
 /* Ландшафтная ориентация */
 @media (orientation: landscape) and (max-height: 500px) {
     .main-game-area {
@@ -668,131 +719,4 @@ body {
         min-height: 35px;
         font-size: 20px;
     }
-}
-
-/* Стили для droppable */
-.floor-cell.empty:not(.locked).ui-droppable-hover {
-    border: 3px solid #4caf50;
-    background: rgba(76, 175, 80, 0.3);
-    transform: scale(1.02);
-    box-shadow: 0 0 15px #4caf50;
-}
-
-.floor-cell.drop-success {
-    animation: dropSuccess 0.3s ease;
-}
-
-@keyframes dropSuccess {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.1); background: #4caf50; color: white; }
-    100% { transform: scale(1); }
-}
-
-
-/* ========== НОВЫЕ СТИЛИ ДЛЯ NATIVE DRAG AND DROP ========== */
-
-/* Клон перетаскиваемой цифры */
-.digit-clone {
-    position: fixed;
-    z-index: 10000;
-    pointer-events: none;
-    animation: pulse 1s infinite;
-    transform-origin: center center;
-    will-change: left, top;
-    touch-action: none;
-}
-
-/* Подсветка активных целей */
-.drop-target-active {
-    position: relative;
-}
-
-.drop-target-active::after {
-    content: '';
-    position: absolute;
-    top: -5px;
-    left: -5px;
-    right: -5px;
-    bottom: -5px;
-    border: 3px dashed #4caf50;
-    border-radius: 15px;
-    animation: borderPulse 1s infinite;
-    pointer-events: none;
-}
-
-/* Подсветка цели под курсором */
-.drop-target-highlight {
-    transform: scale(1.05);
-    background: rgba(76, 175, 80, 0.3) !important;
-    border: 3px solid #4caf50 !important;
-    box-shadow: 0 0 20px #4caf50;
-    transition: all 0.1s ease;
-}
-
-/* Успешное бросание */
-.drop-success {
-    animation: dropSuccess 0.3s ease;
-}
-
-@keyframes dropSuccess {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.2); background: #4caf50; color: white; }
-    100% { transform: scale(1); }
-}
-
-@keyframes borderPulse {
-    0% { opacity: 0.5; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.02); }
-    100% { opacity: 0.5; transform: scale(1); }
-}
-
-/* Улучшения для touch-устройств */
-@media (pointer: coarse) {
-    .digit-item {
-        padding: 20px 0;
-        min-height: 70px;
-        cursor: grab;
-        -webkit-touch-callout: none;
-        -webkit-user-select: none;
-        user-select: none;
-        touch-action: none;
-    }
-
-    .digit-clone {
-        width: 80px !important;
-        height: 80px !important;
-        font-size: 45px !important;
-        box-shadow: 0 15px 30px rgba(0,0,0,0.4) !important;
-    }
-
-    .floor-cell, .unknown {
-        transition: all 0.2s ease;
-    }
-
-    .drop-target-highlight {
-        transform: scale(1.08);
-    }
-}
-
-/* Отключаем стандартное выделение при перетаскивании */
-.digit-item {
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
-    touch-action: pan-y pinch-zoom; /* Разрешаем скролл только когда не тащим */
-}
-
-.digit-item:active {
-    cursor: grabbing;
-}
-
-/* Подсветка для неизвестных в примере */
-.unknown {
-    cursor: copy;
-    position: relative;
-}
-
-.unknown.drop-target-highlight {
-    background: #ffd700 !important;
-    transform: scale(1.1);
 }

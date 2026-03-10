@@ -47,9 +47,10 @@
         <div class="number-badge">Число <span id="current-number">2</span></div>
         <div class="level-badge">Уровень <span id="current-level">0</span>/8</div>
       </div>
+
       <!-- Контейнер для примера (скрыт по умолчанию) -->
       <div class="example-container" id="exampleContainer" style="display: none;">
-        <div class="example-box">
+        <div class="example-box" id="example-box">
           <span id="example-left">1</span>
           <span class="example-operator">+</span>
           <span id="example-right">?</span>
@@ -60,7 +61,7 @@
       </div>
 
       <!-- Игровое поле: Домик -->
-      <div class="house-container">
+      <div class="house-container" id="houseContainer">
         <div class="house">
           <div class="house-roof">
             <span id="house-number">2</span>
@@ -72,7 +73,7 @@
       <!-- Кнопки действий под домиком -->
       <div class="action-bar-compact">
         <button class="primary-btn" id="check-button">Проверить</button>
-        <button class="secondary-btn" id="next-button" disabled>Дальше</button>
+<!--        <button class="secondary-btn" id="next-button" disabled>Дальше</button>-->
         <button class="reset-btn" id="reset-floor-button">↺</button>
       </div>
     </div>
@@ -83,11 +84,11 @@
     </div>
   </div>
 
-  <!-- Нижняя панель с дополнительными кнопками -->
+<!--  &lt;!&ndash; Нижняя панель с дополнительными кнопками &ndash;&gt;
   <div class="bottom-panel">
     <button class="reset-all-btn" id="reset-all-button">🔄 Начать уровень заново</button>
     <div class="message-area" id="game-message"></div>
-  </div>
+  </div>-->
 </div>
 
 <!-- Мотивационный персонаж -->
@@ -100,6 +101,13 @@
 
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
-<script src="js/game.js"></script>
+<script src="js/data.js"></script>
+<script src="js/resourceManager.js"></script>
+<script src="js/gameState.js"></script>
+<script src="js/house.js"></script>
+<script src="js/dragDrop.js"></script>
+<script src="js/gameLogic.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>
