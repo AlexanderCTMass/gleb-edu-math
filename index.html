@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Математика с семьей</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<!-- Экран загрузки -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-content">
+    <h2>Загружаем волшебных помощников...</h2>
+    <div class="loading-progress-bar">
+      <div class="loading-progress-fill" id="loadingProgress"></div>
+    </div>
+    <p id="loadingStatus">0%</p>
+    <div class="loading-characters-preview">
+      <span>👶 👨 👩 👴 👵 🐱 🐕</span>
+    </div>
+  </div>
+</div>
+
+<!-- Основной игровой экран -->
+<div class="game-wrapper" id="gameWrapper" style="opacity: 0;">
+  <!-- Шапка с наградами - компактная -->
+  <header class="rewards-bar">
+    <div class="reward-item">
+      <span class="reward-icon">🏆</span>
+      <span id="score-display">0</span>
+    </div>
+    <div class="reward-item">
+      <span class="reward-icon">⭐</span>
+      <span id="stars-display">0</span>
+    </div>
+    <div class="reward-item">
+      <span class="reward-icon">👑</span>
+      <span id="crowns-display">0</span>
+    </div>
+  </header>
+
+  <!-- Основной игровой контейнер с двумя колонками -->
+  <div class="main-game-area">
+    <!-- Левая колонка - домик -->
+    <div class="house-column">
+      <div class="info-panel-compact">
+        <div class="number-badge">Число <span id="current-number">2</span></div>
+        <div class="level-badge">Уровень <span id="current-level">0</span>/8</div>
+      </div>
+      <!-- Контейнер для примера (скрыт по умолчанию) -->
+      <div class="example-container" id="exampleContainer" style="display: none;">
+        <div class="example-box">
+          <span id="example-left">1</span>
+          <span class="example-operator">+</span>
+          <span id="example-right">?</span>
+          <span class="example-operator">=</span>
+          <span id="example-result">2</span>
+        </div>
+        <div class="example-instruction">Перетащи цифру на место знака "?"</div>
+      </div>
+
+      <!-- Игровое поле: Домик -->
+      <div class="house-container">
+        <div class="house">
+          <div class="house-roof">
+            <span id="house-number">2</span>
+          </div>
+          <div class="floors" id="floors-container"></div>
+        </div>
+      </div>
+
+      <!-- Кнопки действий под домиком -->
+      <div class="action-bar-compact">
+        <button class="primary-btn" id="check-button">Проверить</button>
+        <button class="secondary-btn" id="next-button" disabled>Дальше</button>
+        <button class="reset-btn" id="reset-floor-button">↺</button>
+      </div>
+    </div>
+
+    <!-- Правая колонка - цифры вертикально -->
+    <div class="digits-column">
+      <div class="digits-container-vertical" id="digitsContainer"></div>
+    </div>
+  </div>
+
+  <!-- Нижняя панель с дополнительными кнопками -->
+  <div class="bottom-panel">
+    <button class="reset-all-btn" id="reset-all-button">🔄 Начать уровень заново</button>
+    <div class="message-area" id="game-message"></div>
+  </div>
+</div>
+
+<!-- Мотивационный персонаж -->
+<div class="character-popup" id="characterPopup">
+  <div class="character-avatar" id="characterAvatar">
+    <img src="" alt="" id="characterImage">
+  </div>
+  <div class="character-bubble" id="characterBubble"></div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
