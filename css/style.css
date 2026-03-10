@@ -687,3 +687,112 @@ body {
     50% { transform: scale(1.1); background: #4caf50; color: white; }
     100% { transform: scale(1); }
 }
+
+
+/* ========== НОВЫЕ СТИЛИ ДЛЯ NATIVE DRAG AND DROP ========== */
+
+/* Клон перетаскиваемой цифры */
+.digit-clone {
+    position: fixed;
+    z-index: 10000;
+    pointer-events: none;
+    animation: pulse 1s infinite;
+    transform-origin: center center;
+    will-change: left, top;
+    touch-action: none;
+}
+
+/* Подсветка активных целей */
+.drop-target-active {
+    position: relative;
+}
+
+.drop-target-active::after {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    right: -5px;
+    bottom: -5px;
+    border: 3px dashed #4caf50;
+    border-radius: 15px;
+    animation: borderPulse 1s infinite;
+    pointer-events: none;
+}
+
+/* Подсветка цели под курсором */
+.drop-target-highlight {
+    transform: scale(1.05);
+    background: rgba(76, 175, 80, 0.3) !important;
+    border: 3px solid #4caf50 !important;
+    box-shadow: 0 0 20px #4caf50;
+    transition: all 0.1s ease;
+}
+
+/* Успешное бросание */
+.drop-success {
+    animation: dropSuccess 0.3s ease;
+}
+
+@keyframes dropSuccess {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); background: #4caf50; color: white; }
+    100% { transform: scale(1); }
+}
+
+@keyframes borderPulse {
+    0% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.02); }
+    100% { opacity: 0.5; transform: scale(1); }
+}
+
+/* Улучшения для touch-устройств */
+@media (pointer: coarse) {
+    .digit-item {
+        padding: 20px 0;
+        min-height: 70px;
+        cursor: grab;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        touch-action: none;
+    }
+
+    .digit-clone {
+        width: 80px !important;
+        height: 80px !important;
+        font-size: 45px !important;
+        box-shadow: 0 15px 30px rgba(0,0,0,0.4) !important;
+    }
+
+    .floor-cell, .unknown {
+        transition: all 0.2s ease;
+    }
+
+    .drop-target-highlight {
+        transform: scale(1.08);
+    }
+}
+
+/* Отключаем стандартное выделение при перетаскивании */
+.digit-item {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: pan-y pinch-zoom; /* Разрешаем скролл только когда не тащим */
+}
+
+.digit-item:active {
+    cursor: grabbing;
+}
+
+/* Подсветка для неизвестных в примере */
+.unknown {
+    cursor: copy;
+    position: relative;
+}
+
+.unknown.drop-target-highlight {
+    background: #ffd700 !important;
+    transform: scale(1.1);
+}

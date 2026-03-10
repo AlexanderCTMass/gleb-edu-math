@@ -135,6 +135,13 @@ $(document).ready(function() {
         dragActive: false
     };
 
+    // Предотвращаем скролл страницы при перетаскивании
+    document.addEventListener('touchmove', function(e) {
+        if (gameState.dragActive) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
     // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
     function canShowCharacter() {
         const now = Date.now();
@@ -262,163 +269,192 @@ $(document).ready(function() {
             row.append(leftCell, rightCell);
             container.append(row);
         });
-
-        // Переинициализируем droppable после перерисовки
-        initDroppable();
     }
 
-    // ========== НАСТРОЙКА DRAGGABLE ==========
-    // ========== НАСТРОЙКА DRAGGABLE ==========
-    function initDraggable() {
-        $('.digit-item').draggable({
-            revert: 'invalid',
-            containment: 'document',
-            cursor: 'grabbing',
-            zIndex: 1000,
-            opacity: 0.8,
-            scroll: true,
+    // ========== ИНИЦИАЛИЗАЦИЯ DRAG AND DROP ==========
+    function initDragDrop() {
+        let draggedElement = null;
+        let draggedDigit = null;
+        let clone = null;
+        let startX, startY;
+        let currentX, currentY;
+        let isDragging = false;
 
-            // Настройка позиции помощника относительно курсора
-            helper: function(event) {
-                const digit = $(this).data('digit');
+        // Обработчики для мыши
+        $(document).on('mousedown', '.digit-item', function(e) {
+            e.preventDefault();
+            startDrag(this, e.pageX, e.pageY);
+        });
 
-                // Создаем помощник
-                const helper = $('<div>', {
-                    class: 'digit-item digit-helper',
-                    text: digit,
-                    css: {
-                        width: '70px',
-                        height: '70px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: '#4caf50',
-                        color: 'white',
-                        borderRadius: '50%',
-                        fontSize: '40px',
-                        fontWeight: 'bold',
-                        boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
-                        border: '3px solid white',
-                        position: 'absolute',
-                        zIndex: 1000,
-                        pointerEvents: 'none', // Чтобы не мешать определению цели
-                        transform: 'scale(1.1)'
-                    }
-                });
-
-                // Добавляем в body, чтобы правильно рассчитать позицию
-                $('body').append(helper);
-
-                return helper;
-            },
-
-            // Корректировка позиции помощника
-            drag: function(event, ui) {
-                // Смещаем помощник так, чтобы центр был под курсором
-                const helperWidth = ui.helper.outerWidth();
-                const helperHeight = ui.helper.outerHeight();
-
-                // Позиционируем центр помощника под курсором
-                ui.position.left = event.pageX - helperWidth / 2;
-                ui.position.top = event.pageY - helperHeight / 2;
-            },
-
-            start: function(event, ui) {
-                gameState.dragActive = true;
-
-                // Сразу позиционируем правильно при старте
-                const helperWidth = ui.helper.outerWidth();
-                const helperHeight = ui.helper.outerHeight();
-
-                ui.helper.css({
-                    left: event.pageX - helperWidth / 2,
-                    top: event.pageY - helperHeight / 2
-                });
-
-                // Добавляем класс для анимации
-                $(this).addClass('dragging');
-            },
-
-            stop: function(event, ui) {
-                gameState.dragActive = false;
-                $(this).removeClass('dragging');
-
-                // Удаляем помощник после завершения
-                if (ui.helper) {
-                    ui.helper.remove();
-                }
+        $(document).on('mousemove', function(e) {
+            if (isDragging) {
+                e.preventDefault();
+                moveDrag(e.pageX, e.pageY);
             }
         });
 
-        // Также добавим обработку touch-событий для мобильных устройств
-        if (isTouchDevice()) {
-            enhanceTouchDrag();
-        }
-    }
-
-// Функция определения touch-устройства
-    function isTouchDevice() {
-        return ('ontouchstart' in window) ||
-            (navigator.maxTouchPoints > 0) ||
-            (navigator.msMaxTouchPoints > 0);
-    }
-
-// Улучшение для touch-устройств
-    function enhanceTouchDrag() {
-        $(document).on('touchmove', function(e) {
-            if (gameState.dragActive) {
+        $(document).on('mouseup', function(e) {
+            if (isDragging) {
                 e.preventDefault();
+                endDrag(e.pageX, e.pageY);
+            }
+        });
 
-                // Получаем координаты касания
+        // Обработчики для touch
+        $(document).on('touchstart', '.digit-item', function(e) {
+            e.preventDefault();
+            const touch = e.originalEvent.touches[0];
+            startDrag(this, touch.pageX, touch.pageY);
+        });
+
+        $(document).on('touchmove', function(e) {
+            if (isDragging) {
+                e.preventDefault();
                 const touch = e.originalEvent.touches[0];
-                if (!touch) return;
-
-                // Находим активный draggable элемент
-                const $draggable = $('.digit-item.dragging');
-                if ($draggable.length) {
-                    // Обновляем позицию помощника
-                    const $helper = $('.digit-helper');
-                    if ($helper.length) {
-                        const helperWidth = $helper.outerWidth();
-                        const helperHeight = $helper.outerHeight();
-
-                        $helper.css({
-                            left: touch.pageX - helperWidth / 2,
-                            top: touch.pageY - helperHeight / 2
-                        });
-                    }
-                }
+                moveDrag(touch.pageX, touch.pageY);
             }
         }, { passive: false });
-    }
 
-    // ========== НАСТРОЙКА DROPPABLE ==========
-    // ========== НАСТРОЙКА DROPPABLE ==========
-    function initDroppable() {
-        $('.floor-cell.empty:not(.locked)').droppable({
-            accept: '.digit-item',
-            hoverClass: 'ui-droppable-hover',
+        $(document).on('touchend', function(e) {
+            if (isDragging) {
+                e.preventDefault();
+                const touch = e.originalEvent.changedTouches[0];
+                endDrag(touch.pageX, touch.pageY);
+            }
+        });
 
-            // Активация зоны сброса
-            activate: function() {
-                $(this).addClass('drop-zone-active');
-            },
+        // Функция начала перетаскивания
+        function startDrag(element, x, y) {
+            draggedElement = element;
+            draggedDigit = $(element).data('digit');
+            startX = x;
+            startY = y;
+            isDragging = true;
 
-            // Деактивация зоны сброса
-            deactivate: function() {
-                $(this).removeClass('drop-zone-active');
-            },
+            // Создаем клон для перетаскивания
+            clone = $('<div>', {
+                class: 'digit-clone',
+                text: draggedDigit,
+                css: {
+                    left: x - 35,
+                    top: y - 35,
+                    position: 'fixed',
+                    width: '70px',
+                    height: '70px',
+                    background: '#4caf50',
+                    color: 'white',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '40px',
+                    fontWeight: 'bold',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
+                    border: '3px solid white',
+                    zIndex: 10000,
+                    pointerEvents: 'none',
+                    transform: 'scale(1.1)',
+                    transition: 'all 0.05s ease'
+                }
+            });
 
-            drop: function(event, ui) {
-                const floorIndex = $(this).data('floor');
-                const side = $(this).data('side');
-                const digit = ui.draggable.data('digit');
+            $('body').append(clone);
+
+            // Добавляем класс для подсветки целей
+            $('.floor-cell.empty:not(.locked), .unknown').addClass('drop-target-active');
+
+            // Скрываем оригинал
+            $(draggedElement).css('opacity', '0.3');
+        }
+
+        // Функция перемещения
+        function moveDrag(x, y) {
+            if (!isDragging || !clone) return;
+
+            currentX = x;
+            currentY = y;
+
+            // Перемещаем клон
+            clone.css({
+                left: x - 35,
+                top: y - 35
+            });
+
+            // Подсвечиваем цель под курсором
+            highlightTarget(x, y);
+        }
+
+        // Функция завершения перетаскивания
+        function endDrag(x, y) {
+            if (!isDragging || !clone) return;
+
+            // Находим элемент под курсором
+            const target = findTarget(x, y);
+
+            if (target) {
+                // Бросаем цифру в цель
+                dropDigit(target, draggedDigit);
+            }
+
+            // Убираем клон
+            clone.remove();
+            clone = null;
+
+            // Возвращаем оригинал
+            $(draggedElement).css('opacity', '1');
+
+            // Убираем подсветку целей
+            $('.floor-cell.empty:not(.locked), .unknown').removeClass('drop-target-active');
+            $('.drop-target-highlight').removeClass('drop-target-highlight');
+
+            draggedElement = null;
+            isDragging = false;
+        }
+
+        // Функция подсветки цели под курсором
+        function highlightTarget(x, y) {
+            $('.drop-target-highlight').removeClass('drop-target-highlight');
+
+            const target = findTarget(x, y);
+            if (target) {
+                $(target).addClass('drop-target-highlight');
+            }
+        }
+
+        // Функция поиска цели под координатами
+        function findTarget(x, y) {
+            // Сначала проверяем ячейки домика
+            const cells = document.elementsFromPoint(x, y);
+
+            for (let element of cells) {
+                const $el = $(element);
+
+                // Проверяем ячейки домика
+                if ($el.hasClass('floor-cell') && $el.hasClass('empty') && !$el.hasClass('locked')) {
+                    return element;
+                }
+
+                // Проверяем неизвестные в примере
+                if ($el.hasClass('unknown') && $el.is('#example-left, #example-right, #example-result')) {
+                    return element;
+                }
+            }
+
+            return null;
+        }
+
+        // Функция бросания цифры в цель
+        function dropDigit(target, digit) {
+            const $target = $(target);
+
+            if ($target.hasClass('floor-cell')) {
+                // Бросаем в ячейку домика
+                const floorIndex = $target.data('floor');
+                const side = $target.data('side');
                 const floor = gameState.floors[floorIndex];
 
-                // Проверяем, можно ли редактировать эту ячейку
                 if (!isCellEditable(floorIndex, side)) {
-                    $('#game-message').text('Сюда нельзя поставить цифру').css('color', '#ffa500');
-                    setTimeout(() => $('#game-message').text(''), 1500);
+                    showMessage('Сюда нельзя поставить цифру', '#ffa500');
                     return;
                 }
 
@@ -429,34 +465,50 @@ $(document).ready(function() {
                     floor.userRight = digit;
                 }
 
-                // Если это была ячейка с ошибкой, снимаем подсветку
-                if (gameState.lastWrongFloor === floorIndex && gameState.lastWrongSide === side) {
-                    $(`.floor-row`).eq(floorIndex).css('background', '');
-                }
+                gameState.selectedDigit = digit;
 
-                // Анимация успешного бросания
-                $(this).addClass('drop-success');
-                setTimeout(() => {
-                    $(this).removeClass('drop-success');
-                }, 500);
+                // Анимация успеха
+                $target.addClass('drop-success');
+                setTimeout(() => $target.removeClass('drop-success'), 500);
 
-                // Анимация для цифры, которая вернулась на место
-                ui.draggable.effect('pulsate', { times: 1 }, 300);
-
-                // Обновляем отображение
+                // Обновляем домик
                 renderHouse();
 
-                // Автоматически активируем этот этаж
+                // Активируем этаж
                 gameState.selectedFloorIndex = floorIndex;
                 gameState.selectedSide = side;
 
-                // Показываем сообщение об успешной установке
-                $('#game-message').text(`Цифра ${digit} на месте!`).css('color', '#4caf50');
-                setTimeout(() => $('#game-message').text(''), 1000);
+                showMessage(`Цифра ${digit} на месте!`, '#4caf50');
 
-                updateUI();
+            } else if ($target.hasClass('unknown')) {
+                // Бросаем в пример
+                const id = $target.attr('id');
+
+                gameState.selectedDigit = digit;
+
+                // Обновляем отображение примера
+                if (id === 'example-left') {
+                    $('#example-left').text(digit).removeClass('unknown');
+                } else if (id === 'example-right') {
+                    $('#example-right').text(digit).removeClass('unknown');
+                } else if (id === 'example-result') {
+                    $('#example-result').text(digit).removeClass('unknown');
+                }
+
+                // Анимация успеха
+                $target.addClass('drop-success');
+                setTimeout(() => $target.removeClass('drop-success'), 500);
+
+                showMessage(`Цифра ${digit} на месте!`, '#4caf50');
             }
-        });
+
+            updateUI();
+        }
+
+        function showMessage(text, color) {
+            $('#game-message').text(text).css('color', color);
+            setTimeout(() => $('#game-message').text(''), 1500);
+        }
     }
 
     // ========== СОЗДАНИЕ ЦИФР ДЛЯ ПЕРЕТАСКИВАНИЯ ==========
@@ -468,11 +520,14 @@ $(document).ready(function() {
             const digit = $('<div>')
                 .addClass('digit-item')
                 .text(i)
-                .attr('data-digit', i);
+                .attr('data-digit', i)
+                .attr('draggable', 'false'); // Отключаем нативный drag
+
             container.append(digit);
         }
 
-        initDraggable();
+        // Инициализируем обработчики touch и mouse
+        initDragDrop();
     }
 
     // ========== НАСТРОЙКА УРОВНЯ ==========
