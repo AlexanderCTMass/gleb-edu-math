@@ -23,7 +23,7 @@
 
 <!-- Основной игровой экран -->
 <div class="game-wrapper" id="gameWrapper" style="opacity: 0;">
-  <!-- Шапка с наградами и кнопкой сброса -->
+  <!-- Верхняя панель с наградами и настройками -->
   <header class="top-bar">
     <div class="rewards-bar">
       <div class="reward-item">
@@ -39,9 +39,17 @@
         <span id="crowns-display">0</span>
       </div>
     </div>
-    <button class="reset-button" id="resetGameBtn" title="Начать сначала">
-      <span class="reset-icon">⟲</span>
-    </button>
+    <div class="controls-bar">
+      <button class="control-button voice-toggle" id="voiceToggleBtn" title="Вкл/Выкл озвучку">
+        <span class="control-icon" id="voiceIcon">🔊</span>
+      </button>
+      <button class="control-button auto-voice-toggle" id="autoVoiceToggleBtn" title="Автоозвучка вопросов">
+        <span class="control-icon" id="autoVoiceIcon">🎤</span>
+      </button>
+      <button class="control-button reset-button" id="resetGameBtn" title="Начать сначала">
+        <span class="control-icon">⟲</span>
+      </button>
+    </div>
   </header>
 
   <!-- Информация о текущем числе и уровне -->

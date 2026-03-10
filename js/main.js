@@ -24,6 +24,34 @@ $(document).ready(function() {
         if (!VoiceService.isSupported()) {
             console.log('Speech synthesis not supported');
             $('#speakButton').hide();
+            $('#voiceToggleBtn').hide();
+            $('#autoVoiceToggleBtn').hide();
+        } else {
+            // Инициализируем состояние кнопок озвучки
+            updateVoiceButtons();
+        }
+    }
+
+    // Обновление состояния кнопок озвучки
+    function updateVoiceButtons() {
+        const state = GameState.get();
+
+        // Кнопка вкл/выкл озвучки
+        if (state.voiceEnabled) {
+            $('#voiceToggleBtn').removeClass('disabled');
+            $('#voiceIcon').text('🔊');
+        } else {
+            $('#voiceToggleBtn').addClass('disabled');
+            $('#voiceIcon').text('🔇');
+        }
+
+        // Кнопка автоозвучки
+        if (state.autoVoice) {
+            $('#autoVoiceToggleBtn').addClass('active');
+            $('#autoVoiceIcon').text('🎤');
+        } else {
+            $('#autoVoiceToggleBtn').removeClass('active');
+            $('#autoVoiceIcon').text('🎤');
         }
     }
 
@@ -40,7 +68,7 @@ $(document).ready(function() {
         GameLogic.selectOption(selectedValue);
     });
 
-    // Обработчик для кнопки озвучки
+    // Обработчик для кнопки озвучки (уровень 0)
     $('#speakButton').click(function() {
         if ($(this).hasClass('speaking')) {
             VoiceService.stopSpeaking();
@@ -53,8 +81,41 @@ $(document).ready(function() {
         }
     });
 
-    // Обработчик для кнопки сброса игры
-    $('#resetGameBtn').click(function() {
+    // Обработчик для кнопки вкл/выкл озвучки
+    $('#voiceToggleBtn').click(function() {
+        const newState = GameState.toggleVoice();
+
+        if (!newState) {
+            // Если выключили озвучку, останавливаем текущую
+            VoiceService.stopSpeaking();
+        }
+
+        updateVoiceButtons();
+        UIManager.showMessage(
+            newState ? 'Озвучка включена' : 'Озвучка выключена',
+            newState ? '#4caf50' : '#f44336'
+        );
+    });
+
+    // Обработчик для кнопки автоозвучки
+    $('#autoVoiceToggleBtn').click(function() {
+        const newState = GameState.toggleAutoVoice();
+        updateVoiceButtons();
+        UIManager.showMessage(
+            newState ? 'Автоозвучка включена' : 'Автоозвучка выключена',
+            newState ? '#4caf50' : '#ff9800'
+        );
+
+        // Если включили автоозвучку на текущем уровне, озвучиваем вопрос
+        if (newState && GameState.getProp('currentLevel') > 0) {
+            setTimeout(() => GameLogic.speakCurrentQuestion(), 300);
+        }
+    });
+
+    // ===== ИСПРАВЛЕННЫЙ ОБРАБОТЧИК ДЛЯ КНОПКИ СБРОСА =====
+    // Используем делегирование событий или прямой селектор
+    $(document).on('click', '#resetGameBtn', function() {
+        console.log('Reset button clicked');
         $('#resetModal').fadeIn(200);
     });
 
@@ -65,10 +126,16 @@ $(document).ready(function() {
 
     // Подтверждение сброса
     $('#confirmReset').click(function() {
+        console.log('Reset confirmed');
         $('#resetModal').fadeOut(200);
 
-        // Показываем сообщение
         UIManager.showMessage('Игра начинается сначала!', '#ffd700');
+
+        // Останавливаем озвучку
+        VoiceService.stopSpeaking();
+
+        // Сбрасываем счетчики озвучки
+        VoiceService.resetCounters();
 
         // Сбрасываем состояние игры
         GameState.resetGame();
@@ -76,8 +143,8 @@ $(document).ready(function() {
         // Сбрасываем историю персонажей
         CharacterManager.resetHistory();
 
-        // Останавливаем текущую озвучку
-        VoiceService.stopSpeaking();
+        // Обновляем кнопки
+        updateVoiceButtons();
 
         // Перезагружаем игру с числа 2
         GameLogic.loadNumber(2);
@@ -90,10 +157,11 @@ $(document).ready(function() {
         }
     });
 
-    // Останавливаем озвучку при переходе на другой уровень
+    // Подписываемся на изменения состояния для обновления кнопок
     GameState.subscribe((state) => {
         if (state.currentLevel !== 0) {
             VoiceService.stopSpeaking();
         }
+        updateVoiceButtons();
     });
 });

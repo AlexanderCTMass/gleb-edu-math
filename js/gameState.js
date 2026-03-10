@@ -19,7 +19,10 @@ const GameState = (function() {
         lastWrongSide: null,
         lastCharacterTime: 0,
         minIntervalBetweenCharacters: 8000,
-        dragActive: false
+        dragActive: false,
+        // Настройки озвучки
+        voiceEnabled: true,  // Включена ли озвучка
+        autoVoice: true      // Автоматическая озвучка вопросов
     };
 
     const listeners = [];
@@ -53,7 +56,9 @@ const GameState = (function() {
                 wrongAttempts: state.wrongAttempts,
                 lastWrongFloor: state.lastWrongFloor,
                 lastWrongSide: state.lastWrongSide,
-                lastCharacterTime: state.lastCharacterTime
+                lastCharacterTime: state.lastCharacterTime,
+                voiceEnabled: state.voiceEnabled,
+                autoVoice: state.autoVoice
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
             console.log('Game state saved to storage');
@@ -126,7 +131,9 @@ const GameState = (function() {
                 lastWrongSide: null,
                 lastCharacterTime: 0,
                 minIntervalBetweenCharacters: 8000,
-                dragActive: false
+                dragActive: false,
+                voiceEnabled: true,
+                autoVoice: true
             };
             // Очищаем localStorage
             localStorage.removeItem(STORAGE_KEY);
@@ -163,6 +170,19 @@ const GameState = (function() {
                 state.currentLevel = 0;
                 notifyListeners();
             }
+        },
+
+        // Методы для управления озвучкой
+        toggleVoice: function() {
+            state.voiceEnabled = !state.voiceEnabled;
+            notifyListeners();
+            return state.voiceEnabled;
+        },
+
+        toggleAutoVoice: function() {
+            state.autoVoice = !state.autoVoice;
+            notifyListeners();
+            return state.autoVoice;
         },
 
         // Полная очистка сохранения

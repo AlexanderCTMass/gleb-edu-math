@@ -782,3 +782,225 @@ body {
         font-size: 32px;
     }
 }
+
+/* Добавить в конец файла style.css */
+
+/* ========== ПАНЕЛЬ УПРАВЛЕНИЯ ========== */
+.controls-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.control-button {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: white;
+    font-size: 24px;
+    padding: 0;
+}
+
+.control-button:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+.control-button:active {
+    transform: scale(0.95);
+}
+
+.control-button.disabled {
+    opacity: 0.5;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.control-button.disabled:hover {
+    transform: none;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.control-icon {
+    line-height: 1;
+}
+
+/* Состояния кнопок */
+.voice-toggle.disabled .control-icon {
+    opacity: 0.5;
+}
+
+.auto-voice-toggle.active {
+    background: rgba(76, 175, 80, 0.3);
+    border-color: #4caf50;
+}
+
+/* Адаптация для мобильных */
+@media (max-width: 480px) {
+    .control-button {
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+    }
+}
+
+/* ========== МОДАЛЬНОЕ ОКНО ПОДТВЕРЖДЕНИЯ ========== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.modal-overlay[style*="display: block"],
+.modal-overlay[style*="display:block"],
+.modal-overlay[style*="display: flex"] {
+    display: flex !important;
+    opacity: 1;
+}
+
+.modal-content {
+    background: linear-gradient(135deg, #fff 0%, #f5f5f5 100%);
+    border-radius: 40px;
+    padding: 30px 25px;
+    max-width: 400px;
+    width: 85%;
+    text-align: center;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 0 4px #ffd700;
+    transform: scale(0.8);
+    transition: transform 0.3s ease;
+    margin: 20px;
+}
+
+.modal-overlay[style*="display: flex"] .modal-content {
+    transform: scale(1);
+}
+
+.modal-content h3 {
+    font-size: 28px;
+    color: #764ba2;
+    margin-bottom: 15px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+
+.modal-content p {
+    font-size: 18px;
+    color: #666;
+    margin-bottom: 25px;
+    line-height: 1.5;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.modal-btn {
+    padding: 15px 25px;
+    border: none;
+    border-radius: 60px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex: 1;
+    max-width: 150px;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+}
+
+.modal-btn.cancel-btn {
+    background: #e0e0e0;
+    color: #666;
+    box-shadow: 0 4px 0 #b0b0b0;
+}
+
+.modal-btn.cancel-btn:hover {
+    background: #d0d0d0;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 0 #b0b0b0;
+}
+
+.modal-btn.cancel-btn:active {
+    transform: translateY(4px);
+    box-shadow: 0 1px 0 #b0b0b0;
+}
+
+.modal-btn.confirm-btn {
+    background: #f44336;
+    color: white;
+    box-shadow: 0 4px 0 #b71c1c;
+}
+
+.modal-btn.confirm-btn:hover {
+    background: #d32f2f;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 0 #b71c1c;
+}
+
+.modal-btn.confirm-btn:active {
+    transform: translateY(4px);
+    box-shadow: 0 1px 0 #b71c1c;
+}
+
+/* Анимация появления */
+@keyframes modalAppear {
+    from {
+        opacity: 0;
+        transform: translateY(-30px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Адаптация для мобильных */
+@media (max-width: 480px) {
+    .modal-content {
+        padding: 25px 20px;
+        width: 90%;
+    }
+
+    .modal-content h3 {
+        font-size: 24px;
+    }
+
+    .modal-content p {
+        font-size: 16px;
+    }
+
+    .modal-btn {
+        padding: 12px 20px;
+        font-size: 16px;
+        max-width: 130px;
+    }
+}
+
+@media (max-width: 350px) {
+    .modal-buttons {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .modal-btn {
+        max-width: 100%;
+    }
+}
