@@ -19,10 +19,12 @@ const Phrases = [
     { id: 'father_great', characterId: 'father', type: 'correct', fileName: 'father_great.mp3' },
     { id: 'mother_super', characterId: 'mother', type: 'correct', fileName: 'mother_super.mp3' },
     { id: 'grandfather1_molodets', characterId: 'grandfather1', type: 'correct', fileName: 'grandfather1_molodets.mp3' },
+    { id: 'grandmother2_love2', characterId: 'grandmother2', type: 'correct', fileName: 'grandmother2_love.mp3' },
     { id: 'grandmother1_umnitsa', characterId: 'grandmother1', type: 'correct', fileName: 'grandmother1_umnitsa.mp3' },
-    { id: 'cat_marsel_mur', characterId: 'cat_marsel', type: 'correct', fileName: 'grandmother1_umnitsa.mp3' },
-    { id: 'cat_volt_myau', characterId: 'cat_volt', type: 'correct', fileName: 'grandmother1_umnitsa.mp3' },
-    { id: 'dog_becky_gav', characterId: 'dog_becky', type: 'correct', fileName: 'grandmother1_umnitsa.mp3' },
+    { id: 'cat_marsel_mur', characterId: 'cat_marsel', type: 'correct', fileName: 'cat_marsel_mur.mp3' },
+    { id: 'cat_volt_myau', characterId: 'cat_volt', type: 'correct', fileName: 'cat_volt_myau.mp3' },
+    { id: 'dog_becky_gav', characterId: 'dog_becky', type: 'correct', fileName: 'dog_becky_gav.mp3' },
+
 
     // Неправильные ответы
     { id: 'mother_try_again', characterId: 'mother', type: 'incorrect', fileName: 'mother_try_again.mp3' },
