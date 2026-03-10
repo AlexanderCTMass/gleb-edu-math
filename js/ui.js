@@ -40,26 +40,49 @@ const CharacterManager = (function() {
     }
 
     function showCharacter(reason = 'correct') {
-        if (!canShowCharacter()) return;
+        console.log('Showing character for reason:', reason); // Для отладки
 
+        if (!canShowCharacter()) {
+            console.log('Cannot show character - too soon');
+            return;
+        }
+
+        // Фильтруем фразы по типу
         let availablePhrases = Phrases.filter(p => p.type === reason);
+        console.log('Available phrases for reason:', availablePhrases);
+
         if (availablePhrases.length === 0) {
             availablePhrases = Phrases.filter(p => p.type === 'random');
+            console.log('Using random phrases:', availablePhrases);
+        }
+
+        if (availablePhrases.length === 0) {
+            console.log('No phrases available');
+            return;
         }
 
         const randomPhrase = availablePhrases[Math.floor(Math.random() * availablePhrases.length)];
         const character = Characters.find(c => c.id === randomPhrase.characterId);
 
-        if (!character) return;
+        if (!character) {
+            console.log('Character not found:', randomPhrase.characterId);
+            return;
+        }
+
+        console.log('Selected character:', character);
 
         const characterImg = ResourceManager.getImage(character.id);
         if (characterImg) {
             $('#characterImage').attr('src', characterImg.src);
+        } else {
+            console.log('Image not found for character:', character.id);
         }
 
         const audio = ResourceManager.getAudio(randomPhrase.id);
         if (audio) {
             audio.play().catch(e => console.log('Аудио не воспроизвелось:', e));
+        } else {
+            console.log('Audio not found for phrase:', randomPhrase.id);
         }
 
         const popup = $('#characterPopup');

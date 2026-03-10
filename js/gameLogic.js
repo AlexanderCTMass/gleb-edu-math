@@ -26,7 +26,8 @@ const GameLogic = (function() {
             const unknownPos = HouseManager.showExample(
                 state.currentLevel,
                 state.currentNum,
-                state.floors[state.selectedFloorIndex]
+                state.floors[state.selectedFloorIndex],
+                state.selectedFloorIndex
             );
             GameState.update('unknownPos', unknownPos);
         }
@@ -112,7 +113,8 @@ const GameLogic = (function() {
                 const unknownPos = HouseManager.showExample(
                     state.currentLevel,
                     state.currentNum,
-                    floor
+                    floor,
+                    state.selectedFloorIndex + 1
                 );
                 GameState.update('unknownPos', unknownPos);
             }
@@ -123,7 +125,7 @@ const GameLogic = (function() {
 
         GameState.incrementScore();
         UIManager.showMessage('Правильно! ✅', '#4caf50');
-        CharacterManager.showCharacter('correct');
+        CharacterManager.showCharacter('correct'); // Вызываем персонажа для правильного ответа
 
         GameState.update('selectedDigit', null);
 
@@ -170,7 +172,7 @@ const GameLogic = (function() {
             UIManager.showMessage('Попробуй еще! 🤔', '#ff6b6b');
         }
 
-        CharacterManager.showCharacter('incorrect');
+        CharacterManager.showCharacter('incorrect'); // Вызываем персонажа для неправильного ответа
     }
 
     function completeLevel() {
@@ -210,7 +212,8 @@ const GameLogic = (function() {
             const unknownPos = HouseManager.showExample(
                 state.currentLevel,
                 state.currentNum,
-                floor
+                floor,
+                state.selectedFloorIndex
             );
             GameState.update('unknownPos', unknownPos);
             UIManager.showMessage('Пример сброшен', '#2196f3');
@@ -252,7 +255,8 @@ const GameLogic = (function() {
             const unknownPos = HouseManager.showExample(
                 state.currentLevel,
                 state.currentNum,
-                floor
+                floor,
+                0
             );
             GameState.update('unknownPos', unknownPos);
         } else {

@@ -72,6 +72,8 @@ const HouseManager = (function() {
         const number = currentNum;
         let leftValue, rightValue, result, unknownPos;
 
+        console.log('Showing example for level:', level, 'floor:', floor);
+
         switch(level) {
             case 5:
                 leftValue = floor.left;
@@ -110,6 +112,8 @@ const HouseManager = (function() {
                     unknownPos = 'result';
                 }
                 break;
+            default:
+                return 'right';
         }
 
         $('#example-left').text(leftValue).removeClass('unknown');
