@@ -1,7 +1,7 @@
 // ========== СЕРВИС ОЗВУЧКИ С ПОДДЕРЖКОЙ АЛИСЫ В ЯНДЕКС.БРАУЗЕРЕ ==========
 const YandexVoiceService = (function() {
     // Конфигурация
-    const API_URL = '/api/tts'; // Относительный путь (фронтенд и бэкенд на одном сервере)
+    const API_URL = '/api/tts';
 
     // Состояние
     let isSpeaking = false;
@@ -39,7 +39,6 @@ const YandexVoiceService = (function() {
             console.log('🎤 Яндекс.Браузер detected, using built-in Alice');
         }
 
-        // Инициализация AudioContext после взаимодействия с пользователем
         document.addEventListener('click', initAudioContext, { once: true });
         document.addEventListener('touchstart', initAudioContext, { once: true });
     }
@@ -71,7 +70,6 @@ const YandexVoiceService = (function() {
 
         speechQueue.push({ text, options });
 
-        // Если очередь не обрабатывается, запускаем обработку
         if (!isProcessingQueue) {
             processQueue();
         }
@@ -80,9 +78,7 @@ const YandexVoiceService = (function() {
     }
 
     function processQueue() {
-        // Если уже обрабатываем или очередь пуста
         if (isProcessingQueue || speechQueue.length === 0) {
-            // Если очередь пуста и есть колбэк завершения
             if (speechQueue.length === 0 && onQueueCompleteCallback) {
                 const callback = onQueueCompleteCallback;
                 onQueueCompleteCallback = null;
@@ -94,12 +90,9 @@ const YandexVoiceService = (function() {
         isProcessingQueue = true;
         const next = speechQueue.shift();
 
-        // Останавливаем текущее воспроизведение перед новым
         stopCurrentSpeech();
 
-        // Небольшая задержка для чистоты
         setTimeout(() => {
-            // Пытаемся использовать разные методы озвучки в порядке приоритета
             trySpeak(next.text, {
                 ...next.options,
                 onEnd: () => {
@@ -120,7 +113,6 @@ const YandexVoiceService = (function() {
     }
 
     function stopCurrentSpeech() {
-        // Останавливаем Web Speech
         if (window.speechSynthesis) {
             try {
                 window.speechSynthesis.cancel();
@@ -129,7 +121,6 @@ const YandexVoiceService = (function() {
             }
         }
 
-        // Останавливаем аудио
         if (currentAudio) {
             try {
                 if (currentAudio.stop && typeof currentAudio.stop === 'function') {
@@ -144,7 +135,6 @@ const YandexVoiceService = (function() {
             currentAudio = null;
         }
 
-        // Останавливаем AudioContext
         if (audioContext && audioContext.state !== 'closed') {
             try {
                 audioContext.close().catch(console.warn);
@@ -157,26 +147,18 @@ const YandexVoiceService = (function() {
         isSpeaking = false;
     }
 
-    /**
-     * Пробуем разные методы озвучки в порядке приоритета
-     */
     function trySpeak(text, options) {
-        // 1. Для Яндекс.Браузера - встроенная Алиса
         if (isBuiltInAliceAvailable()) {
             if (speakWithBuiltInAlice(text, options)) {
                 return;
             }
         }
 
-        // 2. Наш серверный API (через Yandex Cloud)
         speakWithCloudAPI(text, options);
     }
 
     // ========== API ДЛЯ ЯНДЕКС.БРАУЗЕРА ==========
 
-    /**
-     * Использование встроенной Алисы в Яндекс.Браузере
-     */
     function speakWithBuiltInAlice(text, options = {}) {
         if (!browserInfo.hasYandexSpeaker) {
             return false;
@@ -185,22 +167,16 @@ const YandexVoiceService = (function() {
         try {
             if (options.onStart) options.onStart();
 
-            // API Яндекс.Браузера для Алисы
             const speaker = window.external.GetSpeaker();
-
-            // Настройки голоса
             speaker.Rate = options.rate || 1.0;
             speaker.Volume = options.volume || 100;
-            speaker.Voice = 'Alice'; // Можно выбрать: Alice, Ok, Mitia, Yandex и др.
-
-            // Воспроизведение
+            speaker.Voice = 'Alice';
             speaker.Speak(text);
+
             isSpeaking = true;
 
-            // В Яндекс.Браузере нет прямого события окончания,
-            // поэтому используем таймер для приблизительной длительности
             const wordCount = text.split(' ').length;
-            const duration = Math.max(1000, wordCount * 400); // Примерно 400ms на слово
+            const duration = Math.max(1000, wordCount * 400);
 
             setTimeout(() => {
                 isSpeaking = false;
@@ -214,21 +190,17 @@ const YandexVoiceService = (function() {
         }
     }
 
-    /**
-     * Проверка, доступна ли встроенная Алиса
-     */
     function isBuiltInAliceAvailable() {
         return browserInfo.isYandexBrowser && browserInfo.hasYandexSpeaker;
     }
 
-    // ========== ОБЛАЧНОЕ API (через ваш сервер) ==========
+    // ========== ОБЛАЧНОЕ API ==========
 
     function speakWithCloudAPI(text, options) {
         stopCurrentSpeech();
 
         if (options.onStart) options.onStart();
 
-        // Проверяем кэш
         if (audioCache.has(text)) {
             console.log('Using cached audio for:', text.substring(0, 30));
             playAudioData(audioCache.get(text), options);
@@ -237,7 +209,6 @@ const YandexVoiceService = (function() {
 
         console.log('Requesting TTS from server:', text.substring(0, 30));
 
-        // Загружаем с API
         fetch(API_URL, {
             method: 'POST',
             headers: {
@@ -260,13 +231,11 @@ const YandexVoiceService = (function() {
             })
             .then(data => {
                 if (data.audio) {
-                    // Сохраняем в кэш
                     if (audioCache.size > 50) {
                         const firstKey = audioCache.keys().next().value;
                         audioCache.delete(firstKey);
                     }
                     audioCache.set(text, data.audio);
-
                     playBase64Audio(data.audio, options);
                 } else {
                     throw new Error('No audio in response');
@@ -274,12 +243,11 @@ const YandexVoiceService = (function() {
             })
             .catch(error => {
                 console.error('Cloud TTS error:', error);
-                // Пробуем Web Speech API как fallback
                 speakWithWebSpeech(text, options);
             });
     }
 
-    // ========== WEB SPEECH API (fallback) ==========
+    // ========== WEB SPEECH API ==========
 
     function speakWithWebSpeech(text, options = {}) {
         if (!window.speechSynthesis) {
@@ -287,7 +255,6 @@ const YandexVoiceService = (function() {
             return false;
         }
 
-        // Останавливаем предыдущее воспроизведение
         try {
             window.speechSynthesis.cancel();
         } catch (e) {}
@@ -309,7 +276,6 @@ const YandexVoiceService = (function() {
         };
 
         utterance.onerror = (event) => {
-            // Игнорируем 'interrupted' - это нормально при остановке
             if (event.error === 'interrupted') {
                 console.log('WebSpeech interrupted (normal)');
             } else {
@@ -418,7 +384,7 @@ const YandexVoiceService = (function() {
             !!window.speechSynthesis;
     }
 
-    // ========== МЕТОДЫ ДЛЯ РАЗЛИЧНЫХ ТИПОВ ОЗВУЧКИ ==========
+    // ========== ОСНОВНЫЕ МЕТОДЫ ОЗВУЧКИ ==========
 
     function speakQuestion(number, left, right, unknownSide) {
         if (!isVoiceEnabled()) return false;
@@ -432,42 +398,25 @@ const YandexVoiceService = (function() {
                 `Если к числу ${right} добавить какое-то число, получится ${number}. Что это за число?`,
                 `${right} плюс сколько будет ${number}?`,
                 `Найди недостающее число: ${right} + ? = ${number}`,
-                `Какое число нужно прибавить к ${right}, чтобы получить ${number}?`,
-                `У нас есть ${right}. Сколько ещё нужно добавить, чтобы стало ${number}?`,
-                `Заполни окошечко: ${right} + ... = ${number}`,
-                `${number} - это ${right} и сколько?`,
-                `Помоги найти второе слагаемое: ${right} + ? = ${number}`,
-                `В домике на этом этаже ${number} живёт ${right}. Кто второй сосед?`
+                `Какое число нужно прибавить к ${right}, чтобы получить ${number}?`
             ];
             text = variants[questionCounter % variants.length];
-
         } else if (unknownSide === 'right') {
             const variants = [
                 `Смотри, тут число ${number}. Мы знаем, что одно слагаемое - ${left}. Какое второе?`,
                 `Если к числу ${left} добавить какое-то число, получится ${number}. Что это за число?`,
                 `${left} плюс сколько будет ${number}?`,
                 `Найди недостающее число: ${left} + ? = ${number}`,
-                `Какое число нужно прибавить к ${left}, чтобы получить ${number}?`,
-                `У нас есть ${left}. Сколько ещё нужно добавить, чтобы стало ${number}?`,
-                `Заполни окошечко: ${left} + ... = ${number}`,
-                `${number} - это ${left} и сколько?`,
-                `Помоги найти второе слагаемое: ${left} + ? = ${number}`,
-                `В домике на этом этаже ${number} живёт ${left}. Кто второй сосед?`
+                `Какое число нужно прибавить к ${left}, чтобы получить ${number}?`
             ];
             text = variants[questionCounter % variants.length];
-
         } else if (unknownSide === 'result') {
             const variants = [
                 `Сколько будет ${left} плюс ${right}?`,
                 `Посчитай: ${left} + ${right} = ?`,
                 `Если сложить ${left} и ${right}, сколько получится?`,
                 `${left} да ${right} - это сколько вместе?`,
-                `Найди сумму чисел ${left} и ${right}`,
-                `${left} плюс ${right} равно?`,
-                `Сколько всего будет, если к ${left} прибавить ${right}?`,
-                `Сосчитай-ка: ${left} + ${right}`,
-                `Какой результат у этого примера: ${left} + ${right}?`,
-                `Помоги решить: к ${left} прибавить ${right}`
+                `Найди сумму чисел ${left} и ${right}`
             ];
             text = variants[questionCounter % variants.length];
         }
@@ -481,50 +430,28 @@ const YandexVoiceService = (function() {
         correctCounter++;
         let text = '';
 
-        const praises = [
-            'Верно!', 'Правильно!', 'Молодец!', 'Отлично!', 'Здорово!',
-            'Супер!', 'Умница!', 'Великолепно!', 'Замечательно!', 'Точно!',
-            'Так держать!', 'Прекрасно!', 'Правильный ответ!'
-        ];
-
+        const praises = ['Верно!', 'Правильно!', 'Молодец!', 'Отлично!', 'Здорово!', 'Супер!'];
         const praise = praises[correctCounter % praises.length];
 
         if (unknownSide === 'left') {
             const variants = [
                 `${praise} ${number} - это ${right} и ${left}`,
                 `${praise} Чтобы получить ${number}, нужно к ${right} прибавить ${left}`,
-                `${praise} ${right} плюс ${left} как раз будет ${number}`,
-                `${praise} Именно так: ${right} + ${left} = ${number}`,
-                `${praise} Ты нашёл второе слагаемое - это ${left}`,
-                `${praise} ${number} состоит из ${right} и ${left}`,
-                `Абсолютно верно! ${right} + ${left} = ${number}`,
-                `${praise} Всё правильно: ${right} и ${left} вместе дают ${number}`
+                `${praise} ${right} плюс ${left} как раз будет ${number}`
             ];
             text = variants[correctCounter % variants.length];
-
         } else if (unknownSide === 'right') {
             const variants = [
                 `${praise} ${number} - это ${left} и ${right}`,
                 `${praise} Чтобы получить ${number}, нужно к ${left} прибавить ${right}`,
-                `${praise} ${left} плюс ${right} как раз будет ${number}`,
-                `${praise} Именно так: ${left} + ${right} = ${number}`,
-                `${praise} Ты нашёл второе слагаемое - это ${right}`,
-                `${praise} ${number} состоит из ${left} и ${right}`,
-                `Абсолютно верно! ${left} + ${right} = ${number}`,
-                `${praise} Всё правильно: ${left} и ${right} вместе дают ${number}`
+                `${praise} ${left} плюс ${right} как раз будет ${number}`
             ];
             text = variants[correctCounter % variants.length];
-
         } else if (unknownSide === 'result') {
             const variants = [
                 `${praise} ${left} плюс ${right} равно ${number}`,
                 `${praise} Сумма чисел ${left} и ${right} - это ${number}`,
-                `${praise} ${left} + ${right} = ${number}`,
-                `${praise} Всё верно, получается ${number}`,
-                `${praise} Ты правильно посчитал: ${number}`,
-                `Правильно! ${left} да ${right} - будет ${number}`,
-                `${praise} Отличный счёт! ${left} + ${right} = ${number}`,
-                `Верно-верно! ${left} и ${right} вместе дают ${number}`
+                `${praise} ${left} + ${right} = ${number}`
             ];
             text = variants[correctCounter % variants.length];
         }
@@ -541,16 +468,8 @@ const YandexVoiceService = (function() {
             'Попробуй ещё раз!',
             'Не получается? Давай подумаем вместе',
             'Почти, попробуй другой вариант',
-            'Ой, что-то не так. Давай ещё разок',
             'Не угадал. Попробуй снова',
-            'Хм, не тот ответ. Подумай ещё',
-            'Ошибочка вышла! Давай другую цифру',
-            'Не спеши, подумай внимательнее',
-            'Немножко не так. Какое число подойдёт?',
-            'Не верно. Давай попробуем другую цифру',
-            'Ой, не то. Посмотри внимательнее на пример',
-            'Так не получится. Какое число нужно?',
-            'Не выходит? Ничего страшного, пробуй дальше!'
+            'Не верно. Давай попробуем другую цифру'
         ];
 
         const text = texts[wrongCounter % texts.length];
@@ -560,65 +479,18 @@ const YandexVoiceService = (function() {
     function speakNumberComposition(number, floors) {
         if (!isVoiceEnabled()) return false;
 
-        const introVariants = [
-            `Число ${number} можно получить разными способами. `,
-            `Посмотри, как можно составить число ${number}. `,
-            `Давай узнаем все способы получить число ${number}. `,
-            `Число ${number} состоит из разных пар чисел. `,
-            `Вот все варианты состава числа ${number}. `
-        ];
+        let text = `Число ${number} можно получить разными способами. `;
 
-        let text = introVariants[Math.floor(Math.random() * introVariants.length)];
+        const variants = floors.map(floor => `${floor.left} и ${floor.right}`).join(', ');
+        text += variants + '. ';
 
-        const variants = [];
-        floors.forEach((floor) => {
-            variants.push(`${floor.left} и ${floor.right}`);
-        });
-
-        const listStyles = [
-            () => variants.join(', ') + '. ',
-            () => 'можно получить как ' + variants.join(', или как ') + '. ',
-            () => 'это ' + variants.join(', также это ') + '. '
-        ];
-
-        const listStyle = listStyles[Math.floor(Math.random() * listStyles.length)];
-        text += listStyle();
-
-        const endings = [
-            'Давай попробуем решить примеры!',
-            'А теперь твоя очередь решать!',
-            'Попробуй найти нужные числа!',
-            'Готов решать примеры?',
-            'Сможешь найти все числа?'
-        ];
-
-        text += endings[Math.floor(Math.random() * endings.length)];
+        text += 'Давай попробуем решить примеры!';
 
         return queueSpeech(text, {
             rate: 0.9,
-            onStart: () => {
-                $('#speakButton').addClass('speaking');
-            },
-            onEnd: () => {
-                $('#speakButton').removeClass('speaking');
-            }
+            onStart: () => $('#speakButton').addClass('speaking'),
+            onEnd: () => $('#speakButton').removeClass('speaking')
         });
-    }
-
-    function speakFloor(number, left, right) {
-        if (!isVoiceEnabled()) return false;
-
-        const variants = [
-            `${left} плюс ${right} равно ${number}`,
-            `${left} и ${right} вместе дают ${number}`,
-            `Если сложить ${left} и ${right}, получится ${number}`,
-            `${left} + ${right} = ${number}`,
-            `К ${left} прибавить ${right} - будет ${number}`,
-            `${left} да ${right} - это ${number}`
-        ];
-
-        const text = variants[Math.floor(Math.random() * variants.length)];
-        return queueSpeech(text);
     }
 
     function onQueueComplete(callback) {
@@ -638,27 +510,19 @@ const YandexVoiceService = (function() {
     // Инициализация
     init();
 
-    // Публичное API
     return {
-        // Основные методы
         speakQuestion,
         speakCorrectAnswer,
         speakWrongAnswer,
         speakNumberComposition,
-        speakFloor,
         stopSpeaking,
         isSupported,
         onQueueComplete,
         resetCounters,
         clearCache,
         isVoiceEnabled,
-
-        // Специфичные для отладки
         getBrowserInfo: () => ({ ...browserInfo }),
-        isBuiltInAliceAvailable,
-
-        // Для совместимости со старым кодом
-        speak: (text, options) => queueSpeech(text, options)
+        isBuiltInAliceAvailable
     };
 })();
 

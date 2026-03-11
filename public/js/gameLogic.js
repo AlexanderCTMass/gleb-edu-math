@@ -6,7 +6,12 @@ const GameLogic = (function () {
     let unknownSide = null;
     let isWaitingForCharacter = false;
     let isCorrectAnswerPending = false;
-    let isWaitingForVoice = false; // Новый флаг для ожидания озвучки
+    let isWaitingForVoice = false;
+
+    // Счетчик правильных ответов для появления персонажа
+    let correctAnswersCount = 0;
+    // Интервал появления персонажей (каждые 3-5 правильных ответов)
+    const CHARACTER_SHOW_INTERVAL = 4; // По умолчанию каждый 4-й правильный ответ
 
     function init() {
         loadNumber(GameState.getProp('currentNum'));
@@ -19,8 +24,9 @@ const GameLogic = (function () {
         $('#house-number').text(number);
         $('#current-number').text(number);
 
-        // Сбрасываем счетчики озвучки для нового числа
+        // Сбрасываем счетчики для нового числа
         VoiceService.resetCounters();
+        correctAnswersCount = 0;
 
         setupLevel();
     }
@@ -30,12 +36,12 @@ const GameLogic = (function () {
         const floors = HouseManager.setupLevel(state.currentLevel, [...state.floors]);
         GameState.set({ floors });
 
-        // Сбрасываем флаги при настройке уровня
+        // Сбрасываем флаги
         isCorrectAnswerPending = false;
         isWaitingForCharacter = false;
         isWaitingForVoice = false;
 
-        // Для уровня 0 скрываем варианты ответов и показываем кнопку озвучки
+        // Для уровня 0
         if (state.currentLevel === 0) {
             $('#optionsContainer').hide();
             $('#nextCounter').hide();
@@ -76,9 +82,9 @@ const GameLogic = (function () {
             generateOptions();
             enableOptions();
 
-            // Автоматически озвучиваем вопрос, если включено
+            // Автоматически озвучиваем вопрос
             if (GameState.getProp('autoVoice')) {
-                speakCurrentQuestion();
+                setTimeout(() => speakCurrentQuestion(), 300);
             }
         }
     }
@@ -90,14 +96,6 @@ const GameLogic = (function () {
 
         const floor = state.floors[state.selectedFloorIndex];
         VoiceService.speakQuestion(state.currentNum, floor.left, floor.right, unknownSide);
-    }
-
-    function speakCurrentFloor() {
-        const state = GameState.get();
-        const floor = state.floors[state.selectedFloorIndex];
-        const number = state.currentNum;
-
-        VoiceService.speakFloor(number, floor.left, floor.right);
     }
 
     function showNextButton() {
@@ -228,7 +226,7 @@ const GameLogic = (function () {
         }, 250);
     }
 
-    // Функция для завершения правильного ответа
+    // Завершение правильного ответа
     function completeCorrectAnswer() {
         console.log('Completing correct answer, moving to next floor');
         isWaitingForCharacter = false;
@@ -237,7 +235,7 @@ const GameLogic = (function () {
         moveToNextFloor();
     }
 
-    // Функция для завершения неправильного ответа
+    // Завершение неправильного ответа
     function completeIncorrectAnswer() {
         console.log('Completing incorrect answer');
         isWaitingForCharacter = false;
@@ -256,40 +254,57 @@ const GameLogic = (function () {
 
         const isCorrect = (selectedValue === correctAnswer);
 
-        // Блокируем кнопки сразу
+        // Блокируем кнопки
         disableOptions();
         isWaitingForCharacter = true;
 
         if (isCorrect) {
             isCorrectAnswerPending = true;
+            correctAnswersCount++;
 
             $(`.option-btn:contains('${selectedValue}')`).addClass('correct-highlight');
             updateUnknownWithAnswer(selectedValue);
             showConfetti();
             GameState.incrementScore();
 
-            // Озвучиваем правильный ответ
+            // ВСЕГДА озвучиваем правильный ответ (голосом)
             if (GameState.getProp('voiceEnabled')) {
                 const floor = state.floors[state.selectedFloorIndex];
                 VoiceService.speakCorrectAnswer(state.currentNum, floor.left, floor.right, unknownSide);
             }
 
-            // Пытаемся показать персонажа
-            CharacterManager.showCharacter('correct', function () {
-                // Персонаж показался и исчез
-                console.log('Character callback executed');
+            // Решаем, показывать ли персонажа (каждые 3-5 правильных ответов)
+            const shouldShowCharacter = (correctAnswersCount % CHARACTER_SHOW_INTERVAL === 0);
 
-                // Если озвучка включена, ждем её завершения
+            if (shouldShowCharacter) {
+                console.log(`Showing character after ${correctAnswersCount} correct answers`);
+                CharacterManager.showCharacter('correct', function () {
+                    console.log('Character callback executed');
+
+                    // После исчезновения персонажа проверяем, не ждем ли мы еще озвучку
+                    if (GameState.getProp('voiceEnabled')) {
+                        isWaitingForVoice = true;
+                        VoiceService.onQueueComplete(function() {
+                            console.log('Voice queue completed after character');
+                            completeCorrectAnswer();
+                        });
+                    } else {
+                        completeCorrectAnswer();
+                    }
+                });
+            } else {
+                console.log(`No character this time (${correctAnswersCount} correct answers)`);
+                // Персонажа не показываем, просто ждем окончания озвучки
                 if (GameState.getProp('voiceEnabled')) {
                     isWaitingForVoice = true;
                     VoiceService.onQueueComplete(function() {
-                        console.log('Voice queue completed');
+                        console.log('Voice queue completed without character');
                         completeCorrectAnswer();
                     });
                 } else {
                     completeCorrectAnswer();
                 }
-            });
+            }
 
             // Таймер безопасности
             setTimeout(() => {
@@ -300,18 +315,30 @@ const GameLogic = (function () {
             }, 8000);
 
         } else {
+            // НЕПРАВИЛЬНЫЙ ОТВЕТ
             $(`.option-btn:contains('${selectedValue}')`).addClass('wrong-highlight');
 
-            // Озвучиваем неправильный ответ
+            // Озвучиваем неправильный ответ (всегда)
             if (GameState.getProp('voiceEnabled')) {
                 VoiceService.speakWrongAnswer();
             }
 
-            CharacterManager.showCharacter('incorrect', function () {
-                completeIncorrectAnswer();
-            });
+            // Персонажей при неправильных ответах НЕ показываем (или показываем редко)
+            // Можно раскомментировать, если хотите показывать иногда
+            // if (Math.random() < 0.3) { // 30% шанс
+            //     CharacterManager.showCharacter('incorrect', function () {
+            //         completeIncorrectAnswer();
+            //     });
+            // } else {
+            //     completeIncorrectAnswer();
+            // }
 
-            // Таймер безопасности для неправильного ответа
+            // Просто завершаем без персонажа
+            setTimeout(() => {
+                completeIncorrectAnswer();
+            }, 1500);
+
+            // Таймер безопасности
             setTimeout(() => {
                 if (isWaitingForCharacter) {
                     console.log('Incorrect answer timeout - forcing completion');
@@ -333,12 +360,10 @@ const GameLogic = (function () {
                 floor.userRight = answer;
             }
 
-            // Просто обновляем значение в клетке, не перерисовывая весь дом
             const cell = $(`.floor-row:eq(${state.selectedFloorIndex}) .floor-cell[data-side="${unknownSide}"]`);
             cell.text(answer).removeClass('empty unknown').addClass('filled');
 
         } else {
-            // Для уровней с примерами (5-8)
             if (unknownSide === 'left') {
                 $('#example-left').text(answer).removeClass('unknown');
             } else if (unknownSide === 'right') {
@@ -353,7 +378,6 @@ const GameLogic = (function () {
         const state = GameState.get();
 
         if (state.selectedFloorIndex < state.floors.length - 1) {
-            // Переходим на следующий этаж
             const nextIndex = state.selectedFloorIndex + 1;
             GameState.update('selectedFloorIndex', nextIndex);
 
@@ -387,7 +411,6 @@ const GameLogic = (function () {
                 generateOptions();
                 enableOptions();
 
-                // Автоматически озвучиваем новый вопрос
                 if (GameState.getProp('autoVoice')) {
                     setTimeout(() => speakCurrentQuestion(), 500);
                 }
@@ -456,8 +479,8 @@ const GameLogic = (function () {
                 GameState.nextNumber();
                 UIManager.showMessage(`Ура! Число ${GameState.getProp('currentNum') - 1} освоено! 👑 +1`, '#ffd700');
 
-                // Сбрасываем счетчики озвучки для нового числа
                 VoiceService.resetCounters();
+                correctAnswersCount = 0;
 
                 loadNumber(GameState.getProp('currentNum'));
             } else {
