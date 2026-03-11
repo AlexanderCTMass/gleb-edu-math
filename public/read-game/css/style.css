@@ -1,0 +1,507 @@
+/* ========== ОБЩИЕ СТИЛИ ========== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+    touch-action: manipulation;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* ========== ЭКРАН ЗАГРУЗКИ ========== */
+.loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    transition: opacity 0.5s ease;
+}
+
+.loading-screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.loading-content {
+    text-align: center;
+    color: white;
+    padding: 20px;
+    max-width: 400px;
+    width: 100%;
+}
+
+.loading-progress-bar {
+    width: 100%;
+    height: 15px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 10px;
+    margin: 20px 0;
+    overflow: hidden;
+}
+
+.loading-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #4caf50, #8bc34a);
+    transition: width 0.3s ease;
+}
+
+/* ========== ОСНОВНОЙ КОНТЕЙНЕР ========== */
+.game-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    transition: opacity 0.5s ease;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 10px 0;
+}
+
+/* ========== ВЕРХНЯЯ ПАНЕЛЬ ========== */
+.top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+    gap: 10px;
+}
+
+.rewards-bar {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border-radius: 50px;
+    padding: 10px 15px;
+    display: flex;
+    justify-content: space-around;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    flex: 1;
+}
+
+.reward-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 4vw;
+    color: white;
+    font-weight: bold;
+}
+
+.controls-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.control-button {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: white;
+    font-size: 24px;
+}
+
+/* ========== ИНФОРМАЦИОННАЯ ПАНЕЛЬ ========== */
+.info-panel {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    flex-shrink: 0;
+    gap: 10px;
+}
+
+.level-badge, .level-name-badge {
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(5px);
+    padding: 8px 12px;
+    border-radius: 30px;
+    color: white;
+    font-size: 3.5vw;
+    font-weight: bold;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.level-name-badge {
+    flex: 1;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ========== ОСНОВНОЙ КОНТЕНТ ========== */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 0;
+}
+
+/* ========== РЕЖИМ ОБУЧЕНИЯ ========== */
+.learning-mode {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+    height: 100%;
+}
+
+.syllable-card {
+    background: white;
+    border-radius: 60px;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 15px 0 #b8860b, 0 20px 30px rgba(0,0,0,0.3);
+    border: 5px solid #ffd700;
+    width: 90%;
+    max-width: 400px;
+}
+
+.syllable-display {
+    font-size: 20vw;
+    font-weight: bold;
+    color: #764ba2;
+    text-shadow: 3px 3px 0 #ffd700;
+    line-height: 1;
+}
+
+.speak-button {
+    background: linear-gradient(145deg, #4a90e2, #357abd);
+    border: none;
+    border-radius: 60px;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 8px 0 #2a5f8a, 0 5px 15px rgba(0,0,0,0.3);
+    border: 3px solid white;
+    transition: all 0.1s ease;
+}
+
+.speak-button .speak-icon {
+    font-size: 40px;
+    color: white;
+}
+
+.speak-button:active {
+    transform: translateY(6px);
+    box-shadow: 0 2px 0 #2a5f8a;
+}
+
+.speak-button.speaking {
+    animation: pulseSpeak 1s infinite;
+}
+
+@keyframes pulseSpeak {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); background: #f44336; }
+    100% { transform: scale(1); }
+}
+
+.next-syllable-btn {
+    background: linear-gradient(145deg, #4caf50, #45a049);
+    color: white;
+    border: none;
+    border-radius: 60px;
+    padding: 20px 40px;
+    font-size: 6vw;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 10px 0 #2e7d32, 0 10px 20px rgba(0,0,0,0.3);
+    border: 3px solid white;
+    transition: all 0.1s ease;
+    width: 90%;
+    max-width: 300px;
+    animation: pulseButton 2s infinite;
+}
+
+.next-syllable-btn:active {
+    transform: translateY(8px);
+    box-shadow: 0 2px 0 #2e7d32;
+}
+
+@keyframes pulseButton {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* ========== РЕЖИМ ПРОВЕРКИ ========== */
+.testing-mode {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    height: 100%;
+}
+
+.question-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.progress-badge, .wrong-badge {
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(5px);
+    padding: 8px 15px;
+    border-radius: 30px;
+    color: white;
+    font-size: 4vw;
+    font-weight: bold;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.wrong-badge span {
+    color: #ff9800;
+}
+
+.options-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.option-btn {
+    background: white;
+    border: none;
+    border-radius: 40px;
+    padding: 25px 0;
+    font-size: 10vw;
+    font-weight: bold;
+    color: #764ba2;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 8px 0 #b8860b, 0 5px 15px rgba(0,0,0,0.2);
+    border: 3px solid white;
+    transition: all 0.1s ease;
+}
+
+.option-btn:active {
+    transform: translateY(6px);
+    box-shadow: 0 2px 0 #b8860b;
+}
+
+.option-btn.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.option-btn.correct-highlight {
+    background: #4caf50;
+    color: white;
+    transform: scale(1.02);
+    box-shadow: 0 4px 0 #2e7d32;
+}
+
+.option-btn.wrong-highlight {
+    background: #f44336;
+    color: white;
+    transform: scale(0.98);
+}
+
+.repeat-question-btn {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(5px);
+    border: 2px solid white;
+    border-radius: 60px;
+    padding: 15px;
+    color: white;
+    font-size: 4vw;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: auto;
+}
+
+.repeat-question-btn .speak-icon {
+    font-size: 5vw;
+}
+
+/* ========== ПЕРСОНАЖ ========== */
+.character-popup {
+    position: fixed;
+    bottom: 20px;
+    left: -300px;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    z-index: 1000;
+    transition: left 0.5s ease-in-out;
+    pointer-events: none;
+}
+
+.character-popup.show {
+    left: 20px;
+}
+
+.character-popup.show.from-right {
+    left: auto;
+    right: 20px;
+}
+
+.character-avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 4px solid #ffd700;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    animation: bounceIn 0.5s ease;
+}
+
+.character-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+@keyframes bounceIn {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* ========== СООБЩЕНИЯ ========== */
+.message-area {
+    text-align: center;
+    color: white;
+    font-size: 4vw;
+    font-weight: bold;
+    min-height: 30px;
+    margin-top: 10px;
+}
+
+/* ========== МОДАЛЬНОЕ ОКНО ========== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 40px;
+    padding: 30px;
+    max-width: 400px;
+    width: 85%;
+    text-align: center;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 0 4px #ffd700;
+}
+
+.modal-content h3 {
+    font-size: 28px;
+    color: #764ba2;
+    margin-bottom: 15px;
+}
+
+.modal-content p {
+    font-size: 18px;
+    color: #666;
+    margin-bottom: 25px;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.modal-btn {
+    padding: 15px 25px;
+    border: none;
+    border-radius: 60px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    flex: 1;
+    max-width: 150px;
+}
+
+.modal-btn.cancel-btn {
+    background: #e0e0e0;
+    color: #666;
+}
+
+.modal-btn.confirm-btn {
+    background: #f44336;
+    color: white;
+    box-shadow: 0 4px 0 #b71c1c;
+}
+
+/* ========== АДАПТАЦИЯ ========== */
+@media (min-width: 600px) {
+    .syllable-display {
+        font-size: 120px;
+    }
+
+    .option-btn {
+        font-size: 60px;
+    }
+
+    .next-syllable-btn {
+        font-size: 28px;
+    }
+}
+
+@media (max-height: 600px) {
+    .syllable-card {
+        padding: 20px;
+    }
+
+    .syllable-display {
+        font-size: 15vw;
+    }
+
+    .option-btn {
+        padding: 15px 0;
+    }
+}
