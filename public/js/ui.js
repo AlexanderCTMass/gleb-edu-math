@@ -31,19 +31,21 @@ const CharacterManager = (function () {
     let onHideCallback = null;
     let safetyTimeout = null;
 
-    // История последних показанных персонажей (храним их id)
+    // История последних показанных персонажей
     let recentCharacters = [];
-    const MAX_HISTORY_SIZE = 5; // Храним последних 3 персонажей
+    const MAX_HISTORY_SIZE = 5;
 
-    // Статистика показов каждого персонажа
+    // Статистика показов
     let characterStats = {};
 
-    // Флаг, указывающий, был ли персонаж закрыт досрочно по клику
+    // Флаг ручного закрытия
     let wasManuallyClosed = false;
+
+    // Защита от множественных вызовов
+    let isShowing = false;
 
     function init() {
         console.log('CharacterManager initialized');
-        // Добавляем обработчик клика по персонажу
         $('#characterPopup').on('click', function () {
             console.log('Character popup clicked - manual close');
             manualHideCharacter();
@@ -55,13 +57,13 @@ const CharacterManager = (function () {
         const now = Date.now();
         const minInterval = GameState.getProp('minIntervalBetweenCharacters');
 
-        // Проверяем временной интервал
+        // Проверяем временной интервал (минимум 8 секунд между персонажами)
         if (now - lastTime <= minInterval) {
             console.log('Cannot show character - too soon');
             return false;
         }
 
-        // Проверяем, не был ли этот персонаж показан в последних 3-х разах
+        // Проверяем, не был ли этот персонаж показан недавно
         if (recentCharacters.includes(characterId)) {
             console.log(`Character ${characterId} was shown recently, skipping`);
             return false;
@@ -70,14 +72,10 @@ const CharacterManager = (function () {
         return true;
     }
 
-    // Добавляем персонажа в историю
     function addToRecent(characterId) {
         recentCharacters.push(characterId);
-
-        // Обновляем статистику
         characterStats[characterId] = (characterStats[characterId] || 0) + 1;
 
-        // Оставляем только последние MAX_HISTORY_SIZE записей
         if (recentCharacters.length > MAX_HISTORY_SIZE) {
             recentCharacters.shift();
         }
@@ -85,17 +83,13 @@ const CharacterManager = (function () {
         console.log('Recent characters:', recentCharacters);
     }
 
-    // Получаем доступных персонажей для указанной причины
     function getAvailableCharacters(reason) {
-        // Находим все фразы для данной причины
         let availablePhrases = Phrases.filter(p => p.type === reason);
 
-        // Если нет фраз для данной причины, берем случайные
         if (availablePhrases.length === 0) {
             availablePhrases = Phrases.filter(p => p.type === 'random');
         }
 
-        // Группируем по персонажам (берем по одной фразе на персонажа)
         const charactersMap = new Map();
         availablePhrases.forEach(phrase => {
             if (!charactersMap.has(phrase.characterId)) {
@@ -103,7 +97,6 @@ const CharacterManager = (function () {
             }
         });
 
-        // Фильтруем персонажей, которые не были в последних показах
         const availableCharacters = Array.from(charactersMap.entries())
             .filter(([characterId, phrase]) => !recentCharacters.includes(characterId))
             .map(([characterId, phrase]) => ({
@@ -130,6 +123,7 @@ const CharacterManager = (function () {
         const popup = $('#characterPopup');
         popup.removeClass('show from-right');
 
+        // Останавливаем все аудио
         const audioElements = document.getElementsByTagName('audio');
         for (let audio of audioElements) {
             if (!audio.paused) {
@@ -138,15 +132,13 @@ const CharacterManager = (function () {
             }
         }
 
-        // Сохраняем колбэк и флаг перед сбросом
         const callback = onHideCallback;
         const wasManual = wasManuallyClosed;
 
-        // Сбрасываем флаг и колбэк
         wasManuallyClosed = false;
         onHideCallback = null;
+        isShowing = false;
 
-        // Вызываем колбэк если он есть
         if (callback) {
             console.log('Executing hide callback, wasManual:', wasManual);
             callback();
@@ -162,9 +154,15 @@ const CharacterManager = (function () {
     }
 
     function showCharacter(reason = 'correct', callback) {
+        // Защита от множественных вызовов
+        if (isShowing) {
+            console.log('Character already showing, skipping');
+            if (callback) setTimeout(callback, 100);
+            return false;
+        }
+
         console.log('Showing character for reason:', reason);
 
-        // Очищаем предыдущие таймеры
         if (currentHideTimeout) {
             clearTimeout(currentHideTimeout);
             currentHideTimeout = null;
@@ -175,26 +173,21 @@ const CharacterManager = (function () {
             safetyTimeout = null;
         }
 
-        // Сбрасываем флаг ручного закрытия
         wasManuallyClosed = false;
+        isShowing = true;
 
         // Получаем доступных персонажей
-        const availableCharacters = getAvailableCharacters(reason);
+        let availableCharacters = getAvailableCharacters(reason);
 
+        // Если нет доступных, пробуем сбросить историю
         if (availableCharacters.length === 0) {
-            console.log('No available characters (all recent)');
-            // Если все персонажи были недавно, сбрасываем историю и пробуем снова
-            if (recentCharacters.length > 0) {
-                console.log('Resetting recent characters history');
-                recentCharacters = [];
-                // Повторно получаем доступных персонажей
-                const retryAvailable = getAvailableCharacters(reason);
-                if (retryAvailable.length > 0) {
-                    return showCharacterWithSelection(reason, callback, retryAvailable);
-                }
-            }
+            console.log('No available characters, resetting history');
+            recentCharacters = [];
+            availableCharacters = getAvailableCharacters(reason);
+        }
 
-            // Если все равно никого нет, берем любого
+        // Если все равно нет, берем любого
+        if (availableCharacters.length === 0) {
             console.log('Taking any available character');
             let anyPhrases = Phrases.filter(p => p.type === reason);
             if (anyPhrases.length === 0) {
@@ -203,7 +196,8 @@ const CharacterManager = (function () {
 
             if (anyPhrases.length === 0) {
                 console.log('No phrases available, calling callback directly');
-                if (callback) callback();
+                isShowing = false;
+                if (callback) setTimeout(callback, 100);
                 return false;
             }
 
@@ -212,11 +206,6 @@ const CharacterManager = (function () {
             return showCharacterWithDetails(character, randomPhrase, reason, callback);
         }
 
-        return showCharacterWithSelection(reason, callback, availableCharacters);
-    }
-
-    function showCharacterWithSelection(reason, callback, availableCharacters) {
-        // Выбираем случайного персонажа из доступных
         const randomIndex = Math.floor(Math.random() * availableCharacters.length);
         const selected = availableCharacters[randomIndex];
         const character = Characters.find(c => c.id === selected.characterId);
@@ -227,28 +216,25 @@ const CharacterManager = (function () {
     function showCharacterWithDetails(character, phrase, reason, callback) {
         // Проверяем временной интервал
         if (!canShowCharacter(character.id)) {
-            console.log('Cannot show character due to time/recent check');
-            if (callback) setTimeout(callback, 2000);
+            console.log('Cannot show character due to time check');
+            isShowing = false;
+            if (callback) setTimeout(callback, 100);
             return false;
         }
 
         console.log('Showing character:', character.name);
 
-        // Сохраняем колбэк
         onHideCallback = callback;
-
-        // Обновляем время последнего показа
         GameState.update('lastCharacterTime', Date.now());
-
-        // Добавляем персонажа в историю
         addToRecent(character.id);
 
-        // Показываем персонажа
+        // Показываем изображение
         const characterImg = ResourceManager.getImage(character.id);
         if (characterImg) {
             $('#characterImage').attr('src', characterImg.src);
         }
 
+        // Проигрываем аудио (фразу персонажа)
         const audio = ResourceManager.getAudio(phrase.id);
         if (audio) {
             audio.play().catch(e => console.log('Аудио не воспроизвелось:', e));
@@ -264,13 +250,13 @@ const CharacterManager = (function () {
             popup.addClass('show');
         }
 
-        // Таймер на скрытие персонажа (автоматическое скрытие)
+        // Автоматическое скрытие через 3.5 секунды
         currentHideTimeout = setTimeout(() => {
             console.log('Auto-hide timeout triggered');
             hideCharacter();
-        }, 4000);
+        }, 3500);
 
-        // Safety таймер - на случай если что-то пойдет не так
+        // Safety таймер
         safetyTimeout = setTimeout(() => {
             console.log('Safety timeout - forcing character hide');
             if ($('#characterPopup').hasClass('show')) {
@@ -283,20 +269,20 @@ const CharacterManager = (function () {
 
     function startRandomTimer() {
         setInterval(() => {
-            if (Math.random() < 0.1) {
+            // 10% шанс каждые 30 секунд
+            if (Math.random() < 0.1 && !isShowing) {
                 showCharacter('random');
             }
-        }, 20000); // Каждые 2 минуты
+        }, 30000);
     }
 
-    // Функция для сброса истории (можно вызывать при переходе на новое число)
     function resetHistory() {
         recentCharacters = [];
         characterStats = {};
+        isShowing = false;
         console.log('Character history reset');
     }
 
-    // Функция для получения статистики
     function getStats() {
         return {
             recent: [...recentCharacters],
@@ -304,7 +290,7 @@ const CharacterManager = (function () {
         };
     }
 
-    // Инициализируем обработчики
+    // Инициализация
     init();
 
     return {
@@ -313,6 +299,6 @@ const CharacterManager = (function () {
         hideCharacter,
         resetHistory,
         getStats,
-        manualHideCharacter // Экспортируем для возможности вызова из консоли
+        manualHideCharacter
     };
 })();
