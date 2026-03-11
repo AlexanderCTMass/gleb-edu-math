@@ -604,7 +604,6 @@ const YandexVoiceService = (function() {
     return {
         // Универсальный метод
         speak,
-
         // Для обратной совместимости
         queueSpeech: speak,
 
