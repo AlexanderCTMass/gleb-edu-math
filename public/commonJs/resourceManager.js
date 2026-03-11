@@ -13,7 +13,7 @@ const ResourceManager = (function() {
     function loadImages(charactersList) {
         charactersList.forEach(char => {
             const img = new Image();
-            img.src = `assets/images/${char.fileName}`;
+            img.src = `../assets/images/${char.fileName}`;
             img.onload = () => {
                 resources.images[char.id] = img;
                 resourceLoaded();
