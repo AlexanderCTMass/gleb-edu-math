@@ -32,7 +32,7 @@ const ResourceManager = (function() {
     function loadAudio(phrasesList) {
         phrasesList.forEach(phrase => {
             const audio = new Audio();
-            audio.src = `assets/audio/phrases/${phrase.fileName}`;
+            audio.src = `../assets/audio/phrases/${phrase.fileName}`;
             audio.preload = 'auto';
 
             audio.addEventListener('canplaythrough', () => {
