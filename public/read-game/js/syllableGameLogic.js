@@ -83,7 +83,7 @@ const SyllableGameLogic = (function() {
 
     function speakCurrentQuestion() {
         if (currentQuestionSyllable) {
-            VoiceService.speak(`Найди слог ${currentQuestionSyllable}`, {
+            VoiceService.queueSpeech(`Найди слог ${currentQuestionSyllable}`, {
                 rate: 0.9,
                 onStart: () => console.log('Speaking question...')
             });
@@ -91,7 +91,7 @@ const SyllableGameLogic = (function() {
     }
 
     function speakSyllable(syllable) {
-        VoiceService.speak(syllable, {
+        VoiceService.queueSpeech(syllable, {
             rate: 0.9,
             pitch: 1.1,
             onStart: () => {
@@ -176,7 +176,7 @@ const SyllableGameLogic = (function() {
             if (SyllableGameState.getProp('voiceEnabled')) {
                 VoiceService.speakWrongAnswer();
                 setTimeout(() => {
-                    VoiceService.speak(`Правильный слог: ${currentQuestionSyllable}`, {
+                    VoiceService.queueSpeech(`Правильный слог: ${currentQuestionSyllable}`, {
                         rate: 0.9
                     });
                 }, 800);
