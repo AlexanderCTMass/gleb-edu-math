@@ -1,5 +1,13 @@
 // ========== ГЛАВНЫЙ ФАЙЛ ИНИЦИАЛИЗАЦИИ ==========
 $(document).ready(function() {
+    // Проверяем, какой браузер используется
+    const isYandexBrowser = /YaBrowser/i.test(navigator.userAgent);
+
+    if (isYandexBrowser) {
+        console.log('🎉 Яндекс.Браузер detected! Using built-in Alice');
+    }
+
+    // Загрузка ресурсов
     ResourceManager.init(
         Characters,
         Phrases,
@@ -22,12 +30,18 @@ $(document).ready(function() {
 
         // Проверяем поддержку озвучки
         if (!VoiceService.isSupported()) {
-            console.log('Speech synthesis not supported');
+            console.log('No speech support');
             $('#speakButton').hide();
             $('#voiceToggleBtn').hide();
             $('#autoVoiceToggleBtn').hide();
         } else {
-            // Инициализируем состояние кнопок озвучки
+            // Показываем информацию об используемом голосе
+            const browserInfo = VoiceService.getBrowserInfo();
+            if (browserInfo.isYandexBrowser && browserInfo.hasYandexSpeaker) {
+                UIManager.showMessage('Алиса готова помогать! 🎤', '#4caf50');
+                $('#voiceIcon').text('🎤');
+            }
+
             updateVoiceButtons();
         }
     }
@@ -35,11 +49,16 @@ $(document).ready(function() {
     // Обновление состояния кнопок озвучки
     function updateVoiceButtons() {
         const state = GameState.get();
+        const browserInfo = VoiceService.getBrowserInfo();
 
         // Кнопка вкл/выкл озвучки
         if (state.voiceEnabled) {
             $('#voiceToggleBtn').removeClass('disabled');
-            $('#voiceIcon').text('🔊');
+            if (browserInfo.isYandexBrowser && browserInfo.hasYandexSpeaker) {
+                $('#voiceIcon').text('🎤'); // Иконка Алисы для Яндекс.Браузера
+            } else {
+                $('#voiceIcon').text('🔊');
+            }
         } else {
             $('#voiceToggleBtn').addClass('disabled');
             $('#voiceIcon').text('🔇');
@@ -58,17 +77,13 @@ $(document).ready(function() {
     // ========== ОБРАБОТЧИКИ СОБЫТИЙ ==========
 
     $('#option1, #option2, #option3').click(function() {
-        if ($(this).hasClass('disabled')) {
-            console.log('Button is disabled');
-            return;
-        }
+        if ($(this).hasClass('disabled')) return;
         if (GameState.getProp('currentLevel') === 0) return;
 
         const selectedValue = parseInt($(this).text());
         GameLogic.selectOption(selectedValue);
     });
 
-    // Обработчик для кнопки озвучки (уровень 0)
     $('#speakButton').click(function() {
         if ($(this).hasClass('speaking')) {
             VoiceService.stopSpeaking();
@@ -81,12 +96,10 @@ $(document).ready(function() {
         }
     });
 
-    // Обработчик для кнопки вкл/выкл озвучки
     $('#voiceToggleBtn').click(function() {
         const newState = GameState.toggleVoice();
 
         if (!newState) {
-            // Если выключили озвучку, останавливаем текущую
             VoiceService.stopSpeaking();
         }
 
@@ -97,7 +110,6 @@ $(document).ready(function() {
         );
     });
 
-    // Обработчик для кнопки автоозвучки
     $('#autoVoiceToggleBtn').click(function() {
         const newState = GameState.toggleAutoVoice();
         updateVoiceButtons();
@@ -106,58 +118,38 @@ $(document).ready(function() {
             newState ? '#4caf50' : '#ff9800'
         );
 
-        // Если включили автоозвучку на текущем уровне, озвучиваем вопрос
         if (newState && GameState.getProp('currentLevel') > 0) {
             setTimeout(() => GameLogic.speakCurrentQuestion(), 300);
         }
     });
 
-    // ===== ИСПРАВЛЕННЫЙ ОБРАБОТЧИК ДЛЯ КНОПКИ СБРОСА =====
-    // Используем делегирование событий или прямой селектор
+    // Сброс игры
     $(document).on('click', '#resetGameBtn', function() {
-        console.log('Reset button clicked');
         $('#resetModal').fadeIn(200);
     });
 
-    // Отмена сброса
     $('#cancelReset').click(function() {
         $('#resetModal').fadeOut(200);
     });
 
-    // Подтверждение сброса
     $('#confirmReset').click(function() {
-        console.log('Reset confirmed');
         $('#resetModal').fadeOut(200);
 
         UIManager.showMessage('Игра начинается сначала!', '#ffd700');
-
-        // Останавливаем озвучку
         VoiceService.stopSpeaking();
-
-        // Сбрасываем счетчики озвучки
         VoiceService.resetCounters();
-
-        // Сбрасываем состояние игры
         GameState.resetGame();
-
-        // Сбрасываем историю персонажей
         CharacterManager.resetHistory();
-
-        // Обновляем кнопки
         updateVoiceButtons();
-
-        // Перезагружаем игру с числа 2
         GameLogic.loadNumber(2);
     });
 
-    // Закрытие модального окна при клике на оверлей
     $('#resetModal').click(function(e) {
         if ($(e.target).is('#resetModal')) {
             $(this).fadeOut(200);
         }
     });
 
-    // Подписываемся на изменения состояния для обновления кнопок
     GameState.subscribe((state) => {
         if (state.currentLevel !== 0) {
             VoiceService.stopSpeaking();
