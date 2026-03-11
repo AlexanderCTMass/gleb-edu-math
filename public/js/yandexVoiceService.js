@@ -1,12 +1,13 @@
 // ========== СЕРВИС ОЗВУЧКИ С ПОДДЕРЖКОЙ АЛИСЫ В ЯНДЕКС.БРАУЗЕРЕ ==========
 const YandexVoiceService = (function() {
     // Конфигурация
-    const API_URL = 'http://84.201.157.119:3000/api/tts'; // Для облачного API
+    const API_URL = '/api/tts'; // Относительный путь (фронтенд и бэкенд на одном сервере)
 
     // Состояние
     let isSpeaking = false;
     let currentAudio = null;
     let audioContext = null;
+    let currentUtterance = null;
 
     // Очередь озвучки
     let speechQueue = [];
@@ -47,6 +48,9 @@ const YandexVoiceService = (function() {
         if (!audioContext && browserInfo.hasWebAudio) {
             try {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
             } catch (e) {
                 console.error('Failed to initialize AudioContext:', e);
             }
@@ -55,6 +59,117 @@ const YandexVoiceService = (function() {
 
     function isVoiceEnabled() {
         return GameState.getProp('voiceEnabled');
+    }
+
+    // ========== УПРАВЛЕНИЕ ОЧЕРЕДЬЮ ==========
+
+    function queueSpeech(text, options = {}) {
+        if (!isVoiceEnabled()) {
+            if (options.onEnd) setTimeout(options.onEnd, 10);
+            return false;
+        }
+
+        speechQueue.push({ text, options });
+
+        // Если очередь не обрабатывается, запускаем обработку
+        if (!isProcessingQueue) {
+            processQueue();
+        }
+
+        return true;
+    }
+
+    function processQueue() {
+        // Если уже обрабатываем или очередь пуста
+        if (isProcessingQueue || speechQueue.length === 0) {
+            // Если очередь пуста и есть колбэк завершения
+            if (speechQueue.length === 0 && onQueueCompleteCallback) {
+                const callback = onQueueCompleteCallback;
+                onQueueCompleteCallback = null;
+                setTimeout(callback, 100);
+            }
+            return;
+        }
+
+        isProcessingQueue = true;
+        const next = speechQueue.shift();
+
+        // Останавливаем текущее воспроизведение перед новым
+        stopCurrentSpeech();
+
+        // Небольшая задержка для чистоты
+        setTimeout(() => {
+            // Пытаемся использовать разные методы озвучки в порядке приоритета
+            trySpeak(next.text, {
+                ...next.options,
+                onEnd: () => {
+                    console.log('Speech ended normally');
+                    isProcessingQueue = false;
+                    if (next.options.onEnd) next.options.onEnd();
+                    processQueue();
+                },
+                onError: (error) => {
+                    console.warn('Speech error (handled):', error?.error || error);
+                    isProcessingQueue = false;
+                    if (next.options.onError) next.options.onError(error);
+                    if (next.options.onEnd) next.options.onEnd();
+                    processQueue();
+                }
+            });
+        }, 50);
+    }
+
+    function stopCurrentSpeech() {
+        // Останавливаем Web Speech
+        if (window.speechSynthesis) {
+            try {
+                window.speechSynthesis.cancel();
+            } catch (e) {
+                console.warn('Error canceling speech:', e);
+            }
+        }
+
+        // Останавливаем аудио
+        if (currentAudio) {
+            try {
+                if (currentAudio.stop && typeof currentAudio.stop === 'function') {
+                    currentAudio.stop();
+                } else if (currentAudio.pause) {
+                    currentAudio.pause();
+                    currentAudio.currentTime = 0;
+                }
+            } catch (e) {
+                console.warn('Error stopping audio:', e);
+            }
+            currentAudio = null;
+        }
+
+        // Останавливаем AudioContext
+        if (audioContext && audioContext.state !== 'closed') {
+            try {
+                audioContext.close().catch(console.warn);
+            } catch (e) {
+                console.warn('Error closing AudioContext:', e);
+            }
+            audioContext = null;
+        }
+
+        isSpeaking = false;
+    }
+
+    /**
+     * Пробуем разные методы озвучки в порядке приоритета
+     */
+    function trySpeak(text, options) {
+        // 1. Для Яндекс.Браузера - встроенная Алиса
+        if (isBuiltInAliceAvailable()) {
+            if (speakWithBuiltInAlice(text, options)) {
+                return;
+            }
+        }
+
+        // 2. Наш серверный API (через Yandex Cloud)
+        speakWithCloudAPI(text, options);
     }
 
     // ========== API ДЛЯ ЯНДЕКС.БРАУЗЕРА ==========
@@ -78,12 +193,6 @@ const YandexVoiceService = (function() {
             speaker.Volume = options.volume || 100;
             speaker.Voice = 'Alice'; // Можно выбрать: Alice, Ok, Mitia, Yandex и др.
 
-            // Обработчики событий (если поддерживаются)
-            const onEndHandler = () => {
-                isSpeaking = false;
-                if (options.onEnd) options.onEnd();
-            };
-
             // Воспроизведение
             speaker.Speak(text);
             isSpeaking = true;
@@ -93,7 +202,10 @@ const YandexVoiceService = (function() {
             const wordCount = text.split(' ').length;
             const duration = Math.max(1000, wordCount * 400); // Примерно 400ms на слово
 
-            setTimeout(onEndHandler, duration);
+            setTimeout(() => {
+                isSpeaking = false;
+                if (options.onEnd) options.onEnd();
+            }, duration);
 
             return true;
         } catch (e) {
@@ -109,83 +221,21 @@ const YandexVoiceService = (function() {
         return browserInfo.isYandexBrowser && browserInfo.hasYandexSpeaker;
     }
 
-    // ========== УПРАВЛЕНИЕ ОЧЕРЕДЬЮ ==========
-
-    function queueSpeech(text, options = {}) {
-        if (!isVoiceEnabled()) {
-            if (options.onEnd) setTimeout(options.onEnd, 10);
-            return false;
-        }
-
-        speechQueue.push({ text, options });
-        processQueue();
-        return true;
-    }
-
-    function processQueue() {
-        if (isProcessingQueue || speechQueue.length === 0 || !isVoiceEnabled()) {
-            if (speechQueue.length === 0 && onQueueCompleteCallback) {
-                const callback = onQueueCompleteCallback;
-                onQueueCompleteCallback = null;
-                callback();
-            }
-            return;
-        }
-
-        isProcessingQueue = true;
-        const next = speechQueue.shift();
-
-        // Пытаемся использовать разные методы озвучки в порядке приоритета
-        trySpeak(next.text, {
-            ...next.options,
-            onEnd: () => {
-                isProcessingQueue = false;
-                if (next.options.onEnd) next.options.onEnd();
-                processQueue();
-            },
-            onError: (error) => {
-                console.error('Speech error:', error);
-                isProcessingQueue = false;
-                if (next.options.onError) next.options.onError(error);
-                if (next.options.onEnd) next.options.onEnd();
-                processQueue();
-            }
-        });
-    }
-
-    /**
-     * Пробуем разные методы озвучки в порядке приоритета
-     */
-    function trySpeak(text, options) {
-        // 1. Для Яндекс.Браузера - встроенная Алиса
-        if (isBuiltInAliceAvailable()) {
-            if (speakWithBuiltInAlice(text, options)) {
-                return;
-            }
-        }
-
-        // 2. Яндекс.Облако API (если доступно)
-        if (!browserInfo.isYandexBrowser) { // Не используем облако в Яндекс.Браузере
-            speakWithCloudAPI(text, options);
-            return;
-        }
-
-        // 3. Web Speech API как fallback
-        speakWithWebSpeech(text, options);
-    }
-
-    // ========== ОБЛАЧНОЕ API (для других браузеров) ==========
+    // ========== ОБЛАЧНОЕ API (через ваш сервер) ==========
 
     function speakWithCloudAPI(text, options) {
-        stopSpeaking();
+        stopCurrentSpeech();
 
         if (options.onStart) options.onStart();
 
         // Проверяем кэш
         if (audioCache.has(text)) {
+            console.log('Using cached audio for:', text.substring(0, 30));
             playAudioData(audioCache.get(text), options);
             return;
         }
+
+        console.log('Requesting TTS from server:', text.substring(0, 30));
 
         // Загружаем с API
         fetch(API_URL, {
@@ -202,7 +252,9 @@ const YandexVoiceService = (function() {
         })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    return response.json().then(err => {
+                        throw new Error(err.error || `HTTP error! status: ${response.status}`);
+                    });
                 }
                 return response.json();
             })
@@ -222,6 +274,7 @@ const YandexVoiceService = (function() {
             })
             .catch(error => {
                 console.error('Cloud TTS error:', error);
+                // Пробуем Web Speech API как fallback
                 speakWithWebSpeech(text, options);
             });
     }
@@ -230,9 +283,14 @@ const YandexVoiceService = (function() {
 
     function speakWithWebSpeech(text, options = {}) {
         if (!window.speechSynthesis) {
-            if (options.onEnd) options.onEnd();
+            if (options.onEnd) setTimeout(options.onEnd, 10);
             return false;
         }
+
+        // Останавливаем предыдущее воспроизведение
+        try {
+            window.speechSynthesis.cancel();
+        } catch (e) {}
 
         if (options.onStart) options.onStart();
 
@@ -241,39 +299,44 @@ const YandexVoiceService = (function() {
         utterance.rate = options.rate || 0.9;
         utterance.pitch = options.pitch || 1.0;
 
-        utterance.onend = options.onEnd;
-        utterance.onerror = options.onError;
+        currentUtterance = utterance;
 
-        window.speechSynthesis.speak(utterance);
+        utterance.onend = () => {
+            console.log('WebSpeech ended');
+            isSpeaking = false;
+            currentUtterance = null;
+            if (options.onEnd) options.onEnd();
+        };
+
+        utterance.onerror = (event) => {
+            // Игнорируем 'interrupted' - это нормально при остановке
+            if (event.error === 'interrupted') {
+                console.log('WebSpeech interrupted (normal)');
+            } else {
+                console.warn('WebSpeech error:', event.error);
+            }
+            isSpeaking = false;
+            currentUtterance = null;
+            if (options.onError) options.onError(event);
+            if (options.onEnd) options.onEnd();
+        };
+
+        try {
+            window.speechSynthesis.speak(utterance);
+            isSpeaking = true;
+        } catch (e) {
+            console.error('WebSpeech speak error:', e);
+            if (options.onError) options.onError(e);
+            if (options.onEnd) options.onEnd();
+        }
+
         return true;
     }
 
     // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 
     function stopSpeaking() {
-        // Останавливаем Web Speech
-        if (window.speechSynthesis) {
-            window.speechSynthesis.cancel();
-        }
-
-        // Останавливаем аудио
-        if (currentAudio) {
-            if (currentAudio.stop && currentAudio.stop instanceof Function) {
-                try {
-                    currentAudio.stop();
-                } catch (e) {}
-            } else if (currentAudio.pause) {
-                currentAudio.pause();
-            }
-            currentAudio = null;
-        }
-
-        if (audioContext && audioContext.state !== 'closed') {
-            audioContext.close().catch(console.warn);
-            audioContext = null;
-        }
-
-        isSpeaking = false;
+        stopCurrentSpeech();
         speechQueue = [];
         isProcessingQueue = false;
         onQueueCompleteCallback = null;
@@ -281,7 +344,7 @@ const YandexVoiceService = (function() {
 
     function playBase64Audio(base64Data, options) {
         try {
-            if (audioContext) {
+            if (audioContext && audioContext.state !== 'closed') {
                 const binaryString = atob(base64Data);
                 const bytes = new Uint8Array(binaryString.length);
                 for (let i = 0; i < binaryString.length; i++) {
@@ -296,6 +359,7 @@ const YandexVoiceService = (function() {
                     currentAudio = source;
 
                     source.onended = () => {
+                        console.log('Audio ended');
                         isSpeaking = false;
                         currentAudio = null;
                         if (options.onEnd) options.onEnd();
@@ -327,12 +391,14 @@ const YandexVoiceService = (function() {
         };
 
         audio.onended = () => {
+            console.log('Audio element ended');
             isSpeaking = false;
             currentAudio = null;
             if (options.onEnd) options.onEnd();
         };
 
         audio.onerror = (e) => {
+            console.error('Audio element error:', e);
             isSpeaking = false;
             currentAudio = null;
             if (options.onError) options.onError(e);
@@ -340,7 +406,7 @@ const YandexVoiceService = (function() {
         };
 
         audio.play().catch(e => {
-            console.error('Play error:', e);
+            console.error('Audio play error:', e);
             if (options.onError) options.onError(e);
             if (options.onEnd) options.onEnd();
         });
@@ -528,24 +594,13 @@ const YandexVoiceService = (function() {
 
         text += endings[Math.floor(Math.random() * endings.length)];
 
-        let voiceSource = '';
-        if (isBuiltInAliceAvailable()) {
-            voiceSource = 'Алиса рассказывает...';
-        } else if (browserInfo.hasSpeechSynthesis) {
-            voiceSource = 'Озвучиваю...';
-        } else {
-            voiceSource = 'Загружаю...';
-        }
-
         return queueSpeech(text, {
             rate: 0.9,
             onStart: () => {
                 $('#speakButton').addClass('speaking');
-                UIManager.showMessage(voiceSource, '#4caf50');
             },
             onEnd: () => {
                 $('#speakButton').removeClass('speaking');
-                UIManager.showMessage('', '');
             }
         });
     }
