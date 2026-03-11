@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Математика с семьей</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<!-- Экран загрузки -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-content">
+    <h2>Загружаем волшебных помощников...</h2>
+    <div class="loading-progress-bar">
+      <div class="loading-progress-fill" id="loadingProgress"></div>
+    </div>
+    <p id="loadingStatus">0%</p>
+    <div class="loading-characters-preview">
+      <span>👶 👨 👩 👴 👵 🐱 🐕</span>
+    </div>
+  </div>
+</div>
+
+<!-- Основной игровой экран -->
+<div class="game-wrapper" id="gameWrapper" style="opacity: 0;">
+  <!-- Верхняя панель с наградами и настройками -->
+  <header class="top-bar">
+    <div class="rewards-bar">
+      <div class="reward-item">
+        <span class="reward-icon">🏆</span>
+        <span id="score-display">0</span>
+      </div>
+      <div class="reward-item">
+        <span class="reward-icon">⭐</span>
+        <span id="stars-display">0</span>
+      </div>
+      <div class="reward-item">
+        <span class="reward-icon">👑</span>
+        <span id="crowns-display">0</span>
+      </div>
+    </div>
+    <div class="controls-bar">
+      <button class="control-button voice-toggle" id="voiceToggleBtn" title="Вкл/Выкл озвучку">
+        <span class="control-icon" id="voiceIcon">🔊</span>
+      </button>
+      <button class="control-button auto-voice-toggle" id="autoVoiceToggleBtn" title="Автоозвучка вопросов">
+        <span class="control-icon" id="autoVoiceIcon">🎤</span>
+      </button>
+      <button class="control-button reset-button" id="resetGameBtn" title="Начать сначала">
+        <span class="control-icon">⟲</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Информация о текущем числе и уровне -->
+  <div class="info-panel">
+    <div class="number-badge">Число <span id="current-number">2</span></div>
+    <div class="level-badge">Уровень <span id="current-level">0</span>/8</div>
+  </div>
+
+  <!-- Верхняя часть - пример/домик -->
+  <div class="top-section">
+    <!-- Контейнер для домика или примера -->
+    <div class="content-container" id="contentContainer">
+      <!-- Домик (для уровней 0-4) -->
+      <div class="house-container" id="houseContainer">
+        <div class="house">
+          <div class="house-roof">
+            <span id="house-number">2</span>
+          </div>
+          <div class="floors" id="floors-container"></div>
+        </div>
+        <!-- Кнопка озвучки для уровня 0 -->
+        <button class="speak-button" id="speakButton" style="display: none;">
+          <span class="speak-icon">🔊</span>
+          <span class="speak-text">Послушать состав числа</span>
+        </button>
+      </div>
+
+      <!-- Пример (для уровней 5-8) -->
+      <div class="example-container" id="exampleContainer" style="display: none;">
+        <div class="example-box" id="example-box">
+          <span id="example-left">1</span>
+          <span class="example-operator">+</span>
+          <span id="example-right">?</span>
+          <span class="example-operator">=</span>
+          <span id="example-result">2</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Нижняя часть - варианты ответов -->
+  <div class="bottom-section">
+    <div class="options-container" id="optionsContainer">
+      <div class="options-grid">
+        <div class="option-btn" id="option1"></div>
+        <div class="option-btn" id="option2"></div>
+        <div class="option-btn" id="option3"></div>
+      </div>
+    </div>
+
+    <!-- Счетчик для следующего примера -->
+    <div class="next-counter" id="nextCounter"></div>
+
+    <!-- Область для сообщений -->
+    <div class="message-area" id="game-message"></div>
+  </div>
+</div>
+
+<!-- Мотивационный персонаж -->
+<div class="character-popup" id="characterPopup">
+  <div class="character-avatar" id="characterAvatar">
+    <img src="" alt="" id="characterImage">
+  </div>
+  <div class="character-bubble" id="characterBubble"></div>
+</div>
+
+<!-- Модальное окно подтверждения сброса -->
+<div class="modal-overlay" id="resetModal" style="display: none;">
+  <div class="modal-content">
+    <h3>Начать сначала?</h3>
+    <p>Весь прогресс будет потерян. Вы уверены?</p>
+    <div class="modal-buttons">
+      <button class="modal-btn cancel-btn" id="cancelReset">Отмена</button>
+      <button class="modal-btn confirm-btn" id="confirmReset">Начать сначала</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
+<!-- В секции script заменить старый voiceService.js на новый -->
+<script src="js/data.js"></script>
+<script src="js/resourceManager.js"></script>
+<script src="js/gameState.js"></script>
+<script src="js/house.js"></script>
+<!-- Закомментировать старый или удалить -->
+<!-- <script src="js/voiceService.js"></script> -->
+<!-- Добавить новый -->
+<script src="js/yandexVoiceService.js"></script>
+<script src="js/gameLogic.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

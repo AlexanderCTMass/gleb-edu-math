@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Учим слоги с семьёй</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<!-- Экран загрузки -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-content">
+    <h2>Загружаем волшебных помощников...</h2>
+    <div class="loading-progress-bar">
+      <div class="loading-progress-fill" id="loadingProgress"></div>
+    </div>
+    <p id="loadingStatus">0%</p>
+    <div class="loading-characters-preview">
+      <span>👶 👨 👩 👴 👵 🐱 🐕</span>
+    </div>
+  </div>
+</div>
+
+<!-- Основной игровой экран -->
+<div class="game-wrapper" id="gameWrapper" style="opacity: 0;">
+  <!-- Верхняя панель -->
+  <header class="top-bar">
+    <div class="rewards-bar">
+      <div class="reward-item">
+        <span class="reward-icon">🏆</span>
+        <span id="score-display">0</span>
+      </div>
+      <div class="reward-item">
+        <span class="reward-icon">⭐</span>
+        <span id="stars-display">0</span>
+      </div>
+      <div class="reward-item">
+        <span class="reward-icon">👑</span>
+        <span id="crowns-display">0</span>
+      </div>
+    </div>
+    <div class="controls-bar">
+      <button class="control-button voice-toggle" id="voiceToggleBtn" title="Вкл/Выкл озвучку">
+        <span class="control-icon" id="voiceIcon">🔊</span>
+      </button>
+      <button class="control-button auto-voice-toggle" id="autoVoiceToggleBtn" title="Автоозвучка">
+        <span class="control-icon" id="autoVoiceIcon">🎤</span>
+      </button>
+      <button class="control-button reset-button" id="resetGameBtn" title="Начать сначала">
+        <span class="control-icon">⟲</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Информационная панель -->
+  <div class="info-panel">
+    <div class="level-badge">Уровень <span id="current-level">1</span>/8</div>
+    <div class="level-name-badge" id="level-name">Гласные и слоги с М, Н</div>
+  </div>
+
+  <!-- Основной контент -->
+  <div class="main-content">
+    <!-- РЕЖИМ ОБУЧЕНИЯ -->
+    <div class="learning-mode" id="learningMode">
+      <div class="syllable-card" id="syllableCard">
+        <div class="syllable-display" id="current-syllable">А</div>
+        <button class="speak-button" id="speakSyllableBtn">
+          <span class="speak-icon">🔊</span>
+        </button>
+      </div>
+      <button class="next-syllable-btn" id="nextSyllableBtn">
+        Следующий слог →
+      </button>
+    </div>
+
+    <!-- РЕЖИМ ПРОВЕРКИ -->
+    <div class="testing-mode" id="testingMode" style="display: none;">
+      <div class="question-info">
+        <div class="progress-badge">
+          Вопросов: <span id="questions-progress">0/10</span>
+        </div>
+        <div class="wrong-badge">
+          Ошибок подряд: <span id="wrong-counter">0</span>/5
+        </div>
+      </div>
+
+      <div class="options-grid" id="optionsContainer">
+        <div class="option-btn" id="option1"></div>
+        <div class="option-btn" id="option2"></div>
+        <div class="option-btn" id="option3"></div>
+        <div class="option-btn" id="option4"></div>
+      </div>
+
+      <button class="repeat-question-btn" id="repeatQuestionBtn">
+        <span class="speak-icon">🔊</span> Повторить задание
+      </button>
+    </div>
+  </div>
+
+  <!-- Область для сообщений -->
+  <div class="message-area" id="game-message"></div>
+</div>
+
+<!-- Мотивационный персонаж -->
+<div class="character-popup" id="characterPopup">
+  <div class="character-avatar" id="characterAvatar">
+    <img src="" alt="" id="characterImage">
+  </div>
+</div>
+
+<!-- Модальное окно подтверждения сброса -->
+<div class="modal-overlay" id="resetModal" style="display: none;">
+  <div class="modal-content">
+    <h3>Начать сначала?</h3>
+    <p>Весь прогресс будет потерян. Вы уверены?</p>
+    <div class="modal-buttons">
+      <button class="modal-btn cancel-btn" id="cancelReset">Отмена</button>
+      <button class="modal-btn confirm-btn" id="confirmReset">Начать сначала</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
+<script src="js/data.js"></script>
+<script src="js/resourceManager.js"></script>
+<script src="js/syllableGameState.js"></script>
+<script src="js/yandexVoiceService.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/characterManager.js"></script>
+<script src="js/syllableGameLogic.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
