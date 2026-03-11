@@ -1,7 +1,7 @@
 // ========== СЕРВИС ОЗВУЧКИ С ПОДДЕРЖКОЙ АЛИСЫ В ЯНДЕКС.БРАУЗЕРЕ ==========
 const YandexVoiceService = (function() {
     // Конфигурация
-    const API_URL = '/api/tts'; // Для облачного API
+    const API_URL = 'http://84.201.157.119:3000/api/tts'; // Для облачного API
 
     // Состояние
     let isSpeaking = false;
