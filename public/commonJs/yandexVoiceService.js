@@ -56,59 +56,25 @@ const YandexVoiceService = (function() {
         }
     }
 
-    // Безопасная проверка включена ли озвучка
     function isVoiceEnabled() {
-        // Проверяем, какая игра используется
-        if (typeof GameState !== 'undefined' && GameState.getProp) {
-            return GameState.getProp('voiceEnabled');
-        } else if (typeof SyllableGameState !== 'undefined' && SyllableGameState.getProp) {
-            return SyllableGameState.getProp('voiceEnabled');
-        }
-        // По умолчанию возвращаем true, если ни одна игра не определена
-        return true;
+        return GameState.getProp('voiceEnabled');
     }
 
     // ========== УПРАВЛЕНИЕ ОЧЕРЕДЬЮ ==========
 
-    /**
-     * Универсальный метод для озвучки любого текста
-     * @param {string} text - Текст для озвучки
-     * @param {Object} options - Опции (rate, pitch, onStart, onEnd, onError)
-     * @returns {boolean} - Успешно ли добавлено в очередь
-     */
-    function speak(text, options = {}) {
+    function queueSpeech(text, options = {}) {
         if (!isVoiceEnabled()) {
             if (options.onEnd) setTimeout(options.onEnd, 10);
             return false;
         }
 
-        if (!text || text.trim() === '') {
-            if (options.onEnd) setTimeout(options.onEnd, 10);
-            return false;
-        }
-
-        speechQueue.push({
-            text: text.trim(),
-            options: {
-                rate: options.rate || 0.9,
-                pitch: options.pitch || 1.0,
-                voice: options.voice || 'alena',
-                emotion: options.emotion || 'good',
-                onStart: options.onStart,
-                onEnd: options.onEnd,
-                onError: options.onError
-            }
-        });
+        speechQueue.push({ text, options });
 
         if (!isProcessingQueue) {
             processQueue();
         }
 
         return true;
-    }
-
-    function queueSpeech(text, options = {}) {
-        return speak(text, options);
     }
 
     function processQueue() {
@@ -130,7 +96,7 @@ const YandexVoiceService = (function() {
             trySpeak(next.text, {
                 ...next.options,
                 onEnd: () => {
-                    console.log('Speech ended normally:', next.text.substring(0, 30));
+                    console.log('Speech ended normally');
                     isProcessingQueue = false;
                     if (next.options.onEnd) next.options.onEnd();
                     processQueue();
@@ -182,20 +148,13 @@ const YandexVoiceService = (function() {
     }
 
     function trySpeak(text, options) {
-        // Пробуем встроенную Алису (только в Яндекс.Браузере)
         if (isBuiltInAliceAvailable()) {
             if (speakWithBuiltInAlice(text, options)) {
                 return;
             }
         }
 
-        // Пробуем облачное API
-        if (browserInfo.hasWebAudio || browserInfo.hasSpeechSynthesis) {
-            speakWithCloudAPI(text, options);
-        } else {
-            // Если ничего не работает, используем Web Speech как запасной вариант
-            speakWithWebSpeech(text, options);
-        }
+        speakWithCloudAPI(text, options);
     }
 
     // ========== API ДЛЯ ЯНДЕКС.БРАУЗЕРА ==========
@@ -244,7 +203,7 @@ const YandexVoiceService = (function() {
 
         if (audioCache.has(text)) {
             console.log('Using cached audio for:', text.substring(0, 30));
-            playBase64Audio(audioCache.get(text), options);
+            playAudioData(audioCache.get(text), options);
             return;
         }
 
@@ -257,8 +216,8 @@ const YandexVoiceService = (function() {
             },
             body: JSON.stringify({
                 text: text,
-                voice: options.voice || 'alena',
-                emotion: options.emotion || 'good',
+                voice: 'alena',
+                emotion: 'good',
                 speed: options.rate || 1.0
             })
         })
@@ -306,17 +265,6 @@ const YandexVoiceService = (function() {
         utterance.lang = 'ru-RU';
         utterance.rate = options.rate || 0.9;
         utterance.pitch = options.pitch || 1.0;
-
-        // Пытаемся найти русский голос
-        try {
-            const voices = window.speechSynthesis.getVoices();
-            const russianVoice = voices.find(voice =>
-                voice.lang.includes('ru') || voice.lang.includes('RU')
-            );
-            if (russianVoice) {
-                utterance.voice = russianVoice;
-            }
-        } catch (e) {}
 
         currentUtterance = utterance;
 
@@ -436,7 +384,7 @@ const YandexVoiceService = (function() {
             !!window.speechSynthesis;
     }
 
-    // ========== МЕТОДЫ ДЛЯ МАТЕМАТИЧЕСКОЙ ИГРЫ ==========
+    // ========== ОСНОВНЫЕ МЕТОДЫ ОЗВУЧКИ ==========
 
     function speakQuestion(number, left, right, unknownSide) {
         if (!isVoiceEnabled()) return false;
@@ -473,7 +421,7 @@ const YandexVoiceService = (function() {
             text = variants[questionCounter % variants.length];
         }
 
-        return speak(text, { rate: 0.9 });
+        return queueSpeech(text, { rate: 0.9 });
     }
 
     function speakCorrectAnswer(number, left, right, unknownSide) {
@@ -508,7 +456,7 @@ const YandexVoiceService = (function() {
             text = variants[correctCounter % variants.length];
         }
 
-        return speak(text);
+        return queueSpeech(text);
     }
 
     function speakWrongAnswer() {
@@ -525,7 +473,7 @@ const YandexVoiceService = (function() {
         ];
 
         const text = texts[wrongCounter % texts.length];
-        return speak(text);
+        return queueSpeech(text);
     }
 
     function speakNumberComposition(number, floors) {
@@ -538,50 +486,11 @@ const YandexVoiceService = (function() {
 
         text += 'Давай попробуем решить примеры!';
 
-        return speak(text, {
+        return queueSpeech(text, {
             rate: 0.9,
-            onStart: () => {
-                if ($('#speakButton').length) {
-                    $('#speakButton').addClass('speaking');
-                }
-            },
-            onEnd: () => {
-                if ($('#speakButton').length) {
-                    $('#speakButton').removeClass('speaking');
-                }
-            }
+            onStart: () => $('#speakButton').addClass('speaking'),
+            onEnd: () => $('#speakButton').removeClass('speaking')
         });
-    }
-
-    // ========== МЕТОДЫ ДЛЯ ИГРЫ СО СЛОГАМИ ==========
-
-    /**
-     * Озвучка слога
-     * @param {string} syllable - Слог для озвучки
-     * @param {Object} options - Опции
-     */
-    function speakSyllable(syllable, options = {}) {
-        return speak(syllable, {
-            rate: 0.9,
-            pitch: 1.1,
-            ...options
-        });
-    }
-
-    /**
-     * Озвучка вопроса для игры со слогами
-     * @param {string} syllable - Искомый слог
-     */
-    function speakSyllableQuestion(syllable) {
-        const variants = [
-            `Найди слог ${syllable}`,
-            `Где слог ${syllable}?`,
-            `Покажи слог ${syllable}`,
-            `Какой слог ${syllable}?`,
-            `Найди ${syllable} среди других слогов`
-        ];
-        const text = variants[questionCounter % variants.length];
-        return speak(text, { rate: 0.9 });
     }
 
     function onQueueComplete(callback) {
@@ -602,22 +511,10 @@ const YandexVoiceService = (function() {
     init();
 
     return {
-        // Универсальный метод
-        speak,
-        // Для обратной совместимости
-        queueSpeech: speak,
-
-        // Специализированные методы для математической игры
         speakQuestion,
         speakCorrectAnswer,
         speakWrongAnswer,
         speakNumberComposition,
-
-        // Специализированные методы для игры со слогами
-        speakSyllable,
-        speakSyllableQuestion,
-
-        // Управление
         stopSpeaking,
         isSupported,
         onQueueComplete,
@@ -629,11 +526,5 @@ const YandexVoiceService = (function() {
     };
 })();
 
-// Заменяем старый VoiceService на новый (если используется глобально)
-if (typeof VoiceService !== 'undefined') {
-    // Сохраняем ссылку на старый сервис, если нужно
-    window.OldVoiceService = VoiceService;
-}
-
-// Создаем глобальную переменную
+// Заменяем старый VoiceService на новый
 const VoiceService = YandexVoiceService;
