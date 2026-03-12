@@ -49,7 +49,7 @@ const CharacterManager = (function () {
     const SAFETY_TIMEOUT = 5000;
 
     function init() {
-        console.log('CharacterManager initialized');
+        console.log('SyllableCharacterManager initialized');
         $('#characterPopup').on('click', function () {
             console.log('Character popup clicked - manual close');
             manualHideCharacter();

@@ -599,7 +599,7 @@ body {
     }
 }
 
-/* В style.css добавить: */
+/* В syllable-style.css добавить: */
 .character-popup {
     cursor: pointer;
     z-index: 1000000;
@@ -618,7 +618,7 @@ body {
     transform: translateY(-5px);
 }
 
-/* Добавить в конец файла style.css */
+/* Добавить в конец файла syllable-style.css */
 
 /* ========== ВЕРХНЯЯ ПАНЕЛЬ С КНОПКОЙ СБРОСА ========== */
 .top-bar {
@@ -783,7 +783,7 @@ body {
     }
 }
 
-/* Добавить в конец файла style.css */
+/* Добавить в конец файла syllable-style.css */
 
 /* ========== ПАНЕЛЬ УПРАВЛЕНИЯ ========== */
 .controls-bar {

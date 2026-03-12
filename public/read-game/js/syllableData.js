@@ -1,5 +1,8 @@
 // ========== ДАННЫЕ ПЕРСОНАЖЕЙ И СЛОГОВ ==========
-const Characters = [
+// Используем пространство имён, чтобы не конфликтовать с математической игрой
+window.SyllableGame = window.SyllableGame || {};
+
+SyllableGame.Characters = [
     { id: 'child', name: 'Ты', fileName: 'child.png' },
     { id: 'father', name: 'Папа', fileName: 'father.png' },
     { id: 'mother', name: 'Мама', fileName: 'mother.png' },
@@ -13,7 +16,7 @@ const Characters = [
     { id: 'dog_becky', name: 'Собака Бэкки', fileName: 'dog_becky.png' }
 ];
 
-const Phrases = [
+SyllableGame.Phrases = [
     // Правильные ответы
     { id: 'child_well_done', characterId: 'child', type: 'correct', fileName: 'child_well_done.mp3' },
     { id: 'father_great', characterId: 'father', type: 'correct', fileName: 'father_great.mp3' },
@@ -38,46 +41,6 @@ const Phrases = [
     { id: 'sister_cool', characterId: 'sister', type: 'random', fileName: 'sister_cool.mp3' }
 ];
 
-// ========== СЛОГИ ДЛЯ ИЗУЧЕНИЯ ==========
-const SyllableLevels = [
-    { // Уровень 1: Гласные и простые слоги с М, Н
-        id: 1,
-        name: 'Гласные и слоги с М, Н',
-        syllables: ['А', 'У', 'МА', 'НА', 'МУ']
-    },
-    { // Уровень 2: Слоги с П, Т, К
-        id: 2,
-        name: 'Слоги с П, Т, К',
-        syllables: ['ПА', 'ТА', 'КА', 'ПУ', 'ТУ']
-    },
-    { // Уровень 3: Слоги с гласными О, И
-        id: 3,
-        name: 'Слоги с О, И',
-        syllables: ['НО', 'МО', 'ПО', 'ТИ', 'КИ']
-    },
-    { // Уровень 4: Слоги с Б, Д, Г (звонкие)
-        id: 4,
-        name: 'Звонкие согласные',
-        syllables: ['БА', 'ДА', 'ГА', 'БУ', 'ДУ']
-    },
-    { // Уровень 5: Слоги с В, Л, Р
-        id: 5,
-        name: 'Слоги с В, Л, Р',
-        syllables: ['ВА', 'ЛА', 'РА', 'ВО', 'ЛО']
-    },
-    { // Уровень 6: Слоги с С, З (свистящие)
-        id: 6,
-        name: 'Свистящие С, З',
-        syllables: ['СА', 'ЗА', 'СО', 'СУ', 'ЗУ']
-    },
-    { // Уровень 7: Слоги с Ш, Ж (шипящие)
-        id: 7,
-        name: 'Шипящие Ш, Ж',
-        syllables: ['ША', 'ЖА', 'ШО', 'ЖУ', 'ШУ']
-    },
-    { // Уровень 8: Слоги с Ч, Щ, Ц
-        id: 8,
-        name: 'Сложные звуки',
-        syllables: ['ЧА', 'ЩА', 'ЦА', 'ЧУ', 'ЩУ']
-    }
-];
+// Для обратной совместимости с кодом, который использует глобальные переменные
+window.Characters = SyllableGame.Characters;
+window.Phrases = SyllableGame.Phrases;

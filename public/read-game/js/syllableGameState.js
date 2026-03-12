@@ -3,35 +3,26 @@ const SyllableGameState = (function() {
     const STORAGE_KEY = 'syllableGameState';
 
     let state = {
-        currentLevel: 1,           // текущий уровень (1-8)
-        currentMode: 'learning',    // 'learning' или 'testing'
-        currentSyllableIndex: 0,    // индекс текущего слога в обучении
-        masteredSyllables: [],      // выученные слоги (id слогов)
-
-        // Для тестирования
-        questionsAnswered: 0,       // всего отвечено вопросов
-        correctAnswers: 0,          // правильных ответов в текущем тесте
-        wrongAnswers: 0,            // неправильных ответов подряд
-        totalWrongAnswers: 0,       // всего неправильных за тест
-
-        // Для возврата к обучению
-        consecutiveWrongAnswers: 0,  // неправильных подряд
-        wrongAnswersThreshold: 5,    // порог для возврата к обучению
-        questionsToPass: 10,         // вопросов для прохождения
-
-        // Статистика
-        score: 0,                    // очки
-        stars: 0,                    // звезды (за уровни)
-        crowns: 0,                   // короны (за числа)
-
-        // Настройки озвучки
+        currentLevel: 1,
+        currentMode: 'learning',
+        currentSyllableIndex: 0,
+        masteredSyllables: [],
+        questionsAnswered: 0,
+        correctAnswers: 0,
+        wrongAnswers: 0,
+        totalWrongAnswers: 0,
+        consecutiveWrongAnswers: 0,
+        wrongAnswersThreshold: 5,
+        questionsToPass: 10,
+        score: 0,
+        stars: 0,
+        crowns: 0,
         voiceEnabled: true,
         autoVoice: true
     };
 
     const listeners = [];
 
-    // Загрузка из localStorage
     function loadFromStorage() {
         try {
             const saved = localStorage.getItem(STORAGE_KEY);
@@ -72,7 +63,13 @@ const SyllableGameState = (function() {
     loadFromStorage();
 
     function notifyListeners() {
-        listeners.forEach(callback => callback(state));
+        listeners.forEach(callback => {
+            try {
+                callback({ ...state });
+            } catch (e) {
+                console.error('Error in state listener:', e);
+            }
+        });
         saveToStorage();
     }
 
@@ -97,10 +94,9 @@ const SyllableGameState = (function() {
 
         subscribe: function(callback) {
             listeners.push(callback);
-            callback(state);
+            callback({ ...state });
         },
 
-        // Специализированные методы для слоговой игры
         enterLearningMode: function() {
             state.currentMode = 'learning';
             state.currentSyllableIndex = 0;
@@ -123,7 +119,7 @@ const SyllableGameState = (function() {
                 notifyListeners();
                 return true;
             }
-            return false; // все слоги уровня изучены
+            return false;
         },
 
         markSyllableAsMastered: function(syllable) {
@@ -168,9 +164,7 @@ const SyllableGameState = (function() {
                 state.totalWrongAnswers = 0;
                 state.consecutiveWrongAnswers = 0;
             } else {
-                // Все уровни пройдены
                 state.crowns++;
-                UIManager.showMessage('Поздравляю! Ты выучил все слоги! 👑', '#ffd700');
             }
             notifyListeners();
         },

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Учим слоги с семьёй</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/syllable-style.css">
 </head>
 <body>
 <!-- Экран загрузки -->
@@ -55,17 +55,17 @@
   <!-- Информационная панель -->
   <div class="info-panel">
     <div class="level-badge">Уровень <span id="current-level">1</span>/8</div>
-    <div class="level-name-badge" id="level-name">Гласные и слоги с М, Н</div>
+    <div class="level-name-badge" id="level-name">Учим слоги</div>
   </div>
 
   <!-- Основной контент -->
   <div class="main-content">
     <!-- Режим обучения -->
     <div id="learningMode" class="learning-mode">
-      <div class="syllable-display">
-        <div class="current-syllable" id="current-syllable">ма</div>
-        <button id="speakSyllableBtn" class="speak-btn">
-          <span class="icon">🔊</span>
+      <div class="syllable-card">
+        <div class="syllable-display" id="current-syllable">ма</div>
+        <button id="speakSyllableBtn" class="speak-button">
+          <span class="speak-icon">🔊</span>
         </button>
       </div>
 
@@ -78,38 +78,36 @@
         Слог <span id="syllable-count">1/5</span>
       </div>
 
-      <button id="nextSyllableBtn" class="next-btn">
+      <button id="nextSyllableBtn" class="next-syllable-btn">
         Следующий слог →
       </button>
     </div>
 
     <!-- Режим тестирования -->
     <div id="testingMode" class="testing-mode" style="display: none;">
+      <div class="question-info">
+        <div class="progress-badge">Вопросов: <span id="questions-progress">0/10</span></div>
+        <div class="wrong-badge">Ошибок подряд: <span id="wrong-counter">0</span></div>
+      </div>
+
       <div class="question-word" id="word-with-blank">
         <span class="word-part">ма</span>
         <span class="word-part blank">___</span>
         <span class="word-part">а</span>
       </div>
 
-      <div class="options-container" id="optionsContainer">
+      <div class="options-grid" id="optionsContainer">
         <button id="option1" class="option-btn">ма</button>
         <button id="option2" class="option-btn">па</button>
         <button id="option3" class="option-btn">на</button>
         <button id="option4" class="option-btn">ка</button>
       </div>
 
-      <div class="testing-footer">
-        <button id="repeatQuestionBtn" class="repeat-btn">
-          <span class="icon">🔊</span> Повторить
-        </button>
-
-        <div class="testing-progress">
-          <span id="questions-progress">0/10</span>
-          <span class="wrong-counter-label">Ошибок подряд:</span>
-          <span id="wrong-counter">0</span>
-        </div>
-      </div>
+      <button id="repeatQuestionBtn" class="repeat-question-btn">
+        <span class="speak-icon">🔊</span> Повторить вопрос
+      </button>
     </div>
+  </div>
 
   <!-- Область для сообщений -->
   <div class="message-area" id="game-message"></div>
@@ -117,9 +115,10 @@
 
 <!-- Мотивационный персонаж -->
 <div class="character-popup" id="characterPopup">
-  <div class="character-avatar" id="characterAvatar">
+  <div class="character-avatar">
     <img src="" alt="" id="characterImage">
   </div>
+  <div class="character-bubble" id="characterBubble"></div>
 </div>
 
 <!-- Модальное окно подтверждения сброса -->
@@ -134,16 +133,39 @@
   </div>
 </div>
 
+<!-- Скрипты - ВАЖЕН ПРАВИЛЬНЫЙ ПОРЯДОК -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
-<script src="js/data.js"></script>
-<script src="../commonJs/resourceManager.js"></script>
-<script src="js/syllableGameState.js"></script>
+
+<!-- Сначала данные -->
+<script src="js/syllableData.js"></script>
+
+<!-- Общие сервисы (ВАЖНО: baseVoiceService должен быть перед voiceService) -->
 <script src="../commonJs/coreVoiceService.js"></script>
-<script src="js/voiceService.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/characterManager.js"></script>
+<script src="../commonJs/baseVoiceService.js"></script>
+<script src="../commonJs/resourceManager.js"></script>
+
+<!-- Затем игровые модули -->
+<script src="js/syllableGameState.js"></script>
+<script src="js/syllableVoiceService.js"></script>
+<script src="js/syllableUi.js"></script>
+<script src="js/syllableCharacterManager.js"></script>
 <script src="js/syllableGameLogic.js"></script>
-<script src="js/main.js"></script>
+<script src="js/syllableMain.js"></script>
+
+<!-- Скрипт для инициализации AudioContext -->
+<script>
+  (function() {
+    function initAudio() {
+      if (typeof VoiceCore !== 'undefined' && VoiceCore._initAudioContext) {
+        VoiceCore._initAudioContext();
+      }
+      document.removeEventListener('click', initAudio);
+      document.removeEventListener('touchstart', initAudio);
+    }
+    document.addEventListener('click', initAudio);
+    document.addEventListener('touchstart', initAudio);
+  })();
+</script>
 </body>
 </html>

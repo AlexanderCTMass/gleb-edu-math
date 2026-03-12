@@ -10,6 +10,7 @@ const SyllableGameLogic = (function() {
     // ========== ИНИЦИАЛИЗАЦИЯ ==========
 
     function init() {
+        console.log('SyllableGameLogic initialized');
         loadLevel();
     }
 
@@ -24,9 +25,7 @@ const SyllableGameLogic = (function() {
 
         $('#level-name').text(level.name);
         $('#current-level').text(state.currentLevel);
-        $('#total-levels').text('/8');
 
-        // Обновляем статистику
         updateStats();
 
         if (state.currentMode === 'learning') {
@@ -44,9 +43,6 @@ const SyllableGameLogic = (function() {
         $('#learningMode').show();
         $('#testingMode').hide();
         $('#nextSyllableBtn').show();
-        $('#optionsContainer').hide();
-        $('#repeatQuestionBtn').hide();
-        $('#speakSyllableBtn').show();
 
         const state = SyllableGameState.get();
         const level = SyllableLevels.find(l => l.id === state.currentLevel);
@@ -57,20 +53,23 @@ const SyllableGameLogic = (function() {
         const word = level.words[state.currentSyllableIndex];
 
         $('#current-syllable').text(syllable);
-        $('#example-word').text(word);
+        $('#word-highlight').text(word || '');
         $('#syllable-count').text(`${state.currentSyllableIndex + 1}/${level.syllables.length}`);
 
-        // Подсвечиваем слог в слове
-        highlightSyllableInWord(syllable, word);
+        highlightSyllableInWord(syllable, word || '');
 
-        // Автоматически озвучиваем слог
-        if (SyllableGameState.getProp('autoVoice')) {
-            setTimeout(() => speakSyllable(syllable, word), 300);
+        if (SyllableGameState.getProp('autoVoice') && typeof SyllableVoiceService !== 'undefined') {
+            setTimeout(() => speakSyllable(syllable, word || ''), 300);
         }
     }
 
     function highlightSyllableInWord(syllable, word) {
-        const index = word.indexOf(syllable);
+        if (!word) {
+            $('#word-highlight').html(word);
+            return;
+        }
+
+        const index = word.toUpperCase().indexOf(syllable.toUpperCase());
         if (index !== -1) {
             const before = word.substring(0, index);
             const after = word.substring(index + syllable.length);
@@ -90,11 +89,7 @@ const SyllableGameLogic = (function() {
         $('#learningMode').hide();
         $('#testingMode').show();
         $('#nextSyllableBtn').hide();
-        $('#optionsContainer').show();
-        $('#repeatQuestionBtn').show();
-        $('#speakSyllableBtn').hide();
 
-        // Сбрасываем флаги
         isWaitingForCharacter = false;
         isWaitingForVoice = false;
         if (characterTimeout) {
@@ -109,56 +104,41 @@ const SyllableGameLogic = (function() {
         const state = SyllableGameState.get();
         const level = SyllableLevels.find(l => l.id === state.currentLevel);
 
-        if (!level) return;
+        if (!level || !level.syllables || level.syllables.length === 0) return;
 
-        // Выбираем случайный слог из изученных
-        const availableSyllables = [...level.syllables];
-        const randomIndex = Math.floor(Math.random() * availableSyllables.length);
-        currentQuestionSyllable = availableSyllables[randomIndex];
-        currentQuestionWord = level.words[randomIndex];
+        const randomIndex = Math.floor(Math.random() * level.syllables.length);
+        currentQuestionSyllable = level.syllables[randomIndex];
+        currentQuestionWord = level.words ? level.words[randomIndex] : '';
 
-        // Генерируем варианты ответов (правильный + 3 других)
-        const otherSyllables = availableSyllables.filter(s => s !== currentQuestionSyllable);
-
-        // Перемешиваем другие слоги и берем первые 3 (или меньше, если их мало)
+        const otherSyllables = level.syllables.filter(s => s !== currentQuestionSyllable);
         const shuffledOthers = shuffleArray([...otherSyllables]);
-        const otherOptions = shuffledOthers.slice(0, Math.min(3, shuffledOthers.length));
+        const otherOptions = shuffledOthers.slice(0, 3);
 
-        // Составляем полный список опций
         currentOptions = [currentQuestionSyllable, ...otherOptions];
 
-        // Если опций меньше 4, добавляем случайные слоги из других уровней
         while (currentOptions.length < 4) {
-            const randomSyllable = getRandomSyllableFromAnyLevel();
-            if (!currentOptions.includes(randomSyllable)) {
-                currentOptions.push(randomSyllable);
-            }
+            currentOptions.push(getRandomSyllableFromAnyLevel());
         }
 
-        // Перемешиваем опции
-        currentOptions = shuffleArray(currentOptions);
+        currentOptions = shuffleArray(currentOptions).slice(0, 4);
 
-        // Отображаем варианты
         for (let i = 0; i < 4; i++) {
             $(`#option${i + 1}`).text(currentOptions[i] || '?');
         }
 
-        // Показываем слово с пропуском
         displayWordWithBlank();
 
-        // Озвучиваем вопрос
-        if (SyllableGameState.getProp('autoVoice')) {
+        if (SyllableGameState.getProp('autoVoice') && typeof SyllableVoiceService !== 'undefined') {
             setTimeout(() => speakCurrentQuestion(), 500);
         }
 
-        // Сбрасываем выделения
         $('.option-btn').removeClass('correct-highlight wrong-highlight disabled');
     }
 
     function displayWordWithBlank() {
         if (!currentQuestionWord || !currentQuestionSyllable) return;
 
-        const index = currentQuestionWord.indexOf(currentQuestionSyllable);
+        const index = currentQuestionWord.toUpperCase().indexOf(currentQuestionSyllable.toUpperCase());
         if (index !== -1) {
             const before = currentQuestionWord.substring(0, index);
             const after = currentQuestionWord.substring(index + currentQuestionSyllable.length);
@@ -175,32 +155,32 @@ const SyllableGameLogic = (function() {
     function getRandomSyllableFromAnyLevel() {
         const allSyllables = [];
         SyllableLevels.forEach(level => {
-            allSyllables.push(...level.syllables);
+            if (level.syllables) {
+                allSyllables.push(...level.syllables);
+            }
         });
 
-        // Убираем повторения
         const uniqueSyllables = [...new Set(allSyllables)];
-
-        // Исключаем текущий правильный слог
         const availableSyllables = uniqueSyllables.filter(s => s !== currentQuestionSyllable);
 
         if (availableSyllables.length > 0) {
             return availableSyllables[Math.floor(Math.random() * availableSyllables.length)];
         }
 
-        // Запасной вариант
-        return 'ба';
+        return 'МА';
     }
 
     // ========== ОЗВУЧКА ==========
 
     function speakCurrentQuestion() {
         if (!currentQuestionSyllable || !currentQuestionWord) return;
+        if (typeof SyllableVoiceService === 'undefined') return;
 
         SyllableVoiceService.speakQuestion(currentQuestionSyllable, currentQuestionWord);
     }
 
     function speakSyllable(syllable, word) {
+        if (typeof SyllableVoiceService === 'undefined') return;
         SyllableVoiceService.speakLearning(syllable, word);
     }
 
@@ -215,20 +195,17 @@ const SyllableGameLogic = (function() {
         if (!level) return;
 
         const currentSyllable = level.syllables[state.currentSyllableIndex];
-
-        // Отмечаем слог как изученный
         SyllableGameState.markSyllableAsMastered(currentSyllable);
 
-        // Переходим к следующему слогу
         const hasNext = SyllableGameState.nextSyllable();
 
         if (!hasNext) {
-            // Все слоги уровня изучены - переходим к тестированию
-            UIManager.showMessage('Отлично! А теперь проверка! ⭐', '#4caf50');
+            if (typeof UIManager !== 'undefined') {
+                UIManager.showMessage('Отлично! А теперь проверка! ⭐', '#4caf50');
+            }
             SyllableGameState.enterTestingMode();
         }
 
-        // Обновляем отображение
         loadLevel();
     }
 
@@ -242,7 +219,6 @@ const SyllableGameLogic = (function() {
 
         const isCorrect = (selectedSyllable === currentQuestionSyllable);
 
-        // Блокируем кнопки
         $('.option-btn').addClass('disabled');
         isWaitingForCharacter = true;
 
@@ -256,46 +232,43 @@ const SyllableGameLogic = (function() {
     }
 
     function handleCorrectAnswer(selectedSyllable) {
-        // Подсвечиваем правильный ответ
         $(`.option-btn:contains('${selectedSyllable}')`).addClass('correct-highlight');
 
-        // Обновляем состояние
         SyllableGameState.handleCorrectAnswer();
 
-        // Показываем правильный ответ в слове
         revealCorrectAnswer();
 
-        // Озвучиваем поздравление
-        if (SyllableGameState.getProp('voiceEnabled')) {
+        if (SyllableGameState.getProp('voiceEnabled') && typeof SyllableVoiceService !== 'undefined') {
             SyllableVoiceService.speakCorrectAnswer(selectedSyllable, currentQuestionWord);
         }
 
-        // Показываем конфетти
         showMiniConfetti();
 
-        // Проверяем, достаточно ли правильных ответов для завершения уровня
         if (SyllableGameState.shouldCompleteLevel()) {
-            // Завершаем уровень
             setTimeout(() => {
-                UIManager.showMessage('Уровень пройден! ⭐ +1', '#ffd700');
+                if (typeof UIManager !== 'undefined') {
+                    UIManager.showMessage('Уровень пройден! ⭐ +1', '#ffd700');
+                }
                 SyllableGameState.completeLevel();
 
-                // Показываем персонажа
-                CharacterManager.showCharacter('level_complete', () => {
+                if (typeof SyllableCharacterManager !== 'undefined') {
+                    SyllableCharacterManager.showCharacter('correct', () => {
+                        loadLevel();
+                        isWaitingForCharacter = false;
+                    });
+                } else {
                     loadLevel();
                     isWaitingForCharacter = false;
-                });
+                }
             }, 800);
         } else {
-            // Показываем персонажа за правильный ответ
             const shouldShowCharacter = (SyllableGameState.getProp('correctAnswers') % 3 === 0);
 
-            if (shouldShowCharacter) {
-                CharacterManager.showCharacter('correct', () => {
+            if (shouldShowCharacter && typeof SyllableCharacterManager !== 'undefined') {
+                SyllableCharacterManager.showCharacter('correct', () => {
                     moveToNextQuestion();
                 });
             } else {
-                // Таймаут перед следующим вопросом
                 characterTimeout = setTimeout(() => {
                     moveToNextQuestion();
                 }, 1500);
@@ -304,23 +277,19 @@ const SyllableGameLogic = (function() {
     }
 
     function handleWrongAnswer(selectedSyllable) {
-        // Подсвечиваем неправильный ответ
         $(`.option-btn:contains('${selectedSyllable}')`).addClass('wrong-highlight');
-
-        // Подсвечиваем правильный ответ
         $(`.option-btn:contains('${currentQuestionSyllable}')`).addClass('correct-highlight');
 
-        // Обновляем состояние
         SyllableGameState.handleWrongAnswer();
 
-        // Озвучиваем ошибку
-        if (SyllableGameState.getProp('voiceEnabled')) {
+        if (SyllableGameState.getProp('voiceEnabled') && typeof SyllableVoiceService !== 'undefined') {
             SyllableVoiceService.speakWrongAnswer(currentQuestionSyllable);
         }
 
-        // Проверяем, не пора ли вернуться к обучению
         if (SyllableGameState.shouldReturnToLearning()) {
-            UIManager.showMessage('Давай ещё раз поучим слоги 📖', '#ff9800');
+            if (typeof UIManager !== 'undefined') {
+                UIManager.showMessage('Давай ещё раз поучим слоги 📖', '#ff9800');
+            }
 
             setTimeout(() => {
                 SyllableGameState.enterLearningMode();
@@ -328,7 +297,6 @@ const SyllableGameLogic = (function() {
                 isWaitingForCharacter = false;
             }, 2000);
         } else {
-            // Таймаут перед следующим вопросом
             characterTimeout = setTimeout(() => {
                 moveToNextQuestion();
             }, 2000);
@@ -354,6 +322,8 @@ const SyllableGameLogic = (function() {
     }
 
     function showMiniConfetti() {
+        if (typeof confetti === 'undefined') return;
+
         confetti({
             particleCount: 30,
             spread: 70,
@@ -382,15 +352,12 @@ const SyllableGameLogic = (function() {
     function updateUI() {
         const state = SyllableGameState.get();
 
-        // Обновляем статистику
         updateStats();
 
-        // Обновляем прогресс в тестировании
         if (state.currentMode === 'testing') {
             $('#questions-progress').text(`${state.correctAnswers}/${state.questionsToPass}`);
             $('#wrong-counter').text(state.consecutiveWrongAnswers);
 
-            // Изменяем цвет счетчика ошибок
             if (state.consecutiveWrongAnswers >= 3) {
                 $('#wrong-counter').css('color', '#ff9800');
             } else if (state.consecutiveWrongAnswers >= 4) {
@@ -400,7 +367,6 @@ const SyllableGameLogic = (function() {
             }
         }
 
-        // Обновляем кнопки озвучки
         updateVoiceUI();
     }
 
@@ -409,14 +375,18 @@ const SyllableGameLogic = (function() {
 
         if (state.voiceEnabled) {
             $('#voiceToggleBtn').removeClass('disabled');
+            $('#voiceIcon').text('🔊');
         } else {
             $('#voiceToggleBtn').addClass('disabled');
+            $('#voiceIcon').text('🔇');
         }
 
         if (state.autoVoice) {
             $('#autoVoiceToggleBtn').addClass('active');
+            $('#autoVoiceIcon').text('🎤');
         } else {
             $('#autoVoiceToggleBtn').removeClass('active');
+            $('#autoVoiceIcon').text('🎤');
         }
     }
 
@@ -428,25 +398,24 @@ const SyllableGameLogic = (function() {
         nextSyllable,
         selectOption,
 
-        speakCurrentQuestion: () => {
+        speakCurrentQuestion: function() {
             if (SyllableGameState.getProp('currentMode') === 'testing') {
                 speakCurrentQuestion();
             }
         },
 
-        speakCurrentSyllable: () => {
+        speakCurrentSyllable: function() {
             if (SyllableGameState.getProp('currentMode') === 'learning') {
                 const state = SyllableGameState.get();
                 const level = SyllableLevels.find(l => l.id === state.currentLevel);
                 if (level) {
                     const syllable = level.syllables[state.currentSyllableIndex];
-                    const word = level.words[state.currentSyllableIndex];
+                    const word = level.words ? level.words[state.currentSyllableIndex] : '';
                     speakSyllable(syllable, word);
                 }
             }
         },
 
-        // Для отладки
         _getCurrentQuestion: () => ({
             syllable: currentQuestionSyllable,
             word: currentQuestionWord,

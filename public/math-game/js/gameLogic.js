@@ -304,9 +304,9 @@ const GameLogic = (function () {
 
         const shouldShowCharacter = (correctAnswersCount % CHARACTER_SHOW_INTERVAL === 0);
 
-        if (shouldShowCharacter && typeof CharacterManager !== 'undefined') {
+        if (shouldShowCharacter && typeof SyllableCharacterManager !== 'undefined') {
             console.log(`Showing character after ${correctAnswersCount} correct answers`);
-            CharacterManager.showCharacter('correct', function () {
+            SyllableCharacterManager.showCharacter('correct', function () {
                 console.log('Character callback executed');
                 handlePostCharacter();
             });

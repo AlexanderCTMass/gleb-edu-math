@@ -1,11 +1,14 @@
 // ========== МЕНЕДЖЕР ПЕРСОНАЖЕЙ ==========
-const CharacterManager = (function () {
+const SyllableCharacterManager = (function () {
     let currentHideTimeout = null;
     let onHideCallback = null;
     let safetyTimeout = null;
     let recentCharacters = [];
     const MAX_HISTORY_SIZE = 5;
     let isShowing = false;
+
+    const AUTO_HIDE_DELAY = 3500;
+    const SAFETY_TIMEOUT = 5000;
 
     function init() {
         $('#characterPopup').on('click', function () {
@@ -14,10 +17,16 @@ const CharacterManager = (function () {
     }
 
     function getAvailableCharacters(reason) {
-        let availablePhrases = Phrases.filter(p => p.type === reason);
+        // Используем SyllableGame.Phrases если доступно, иначе глобальные Phrases
+        const phrases = (window.SyllableGame && SyllableGame.Phrases) || window.Phrases || [];
+        const characters = (window.SyllableGame && SyllableGame.Characters) || window.Characters || [];
+
+        if (!phrases.length) return [];
+
+        let availablePhrases = phrases.filter(p => p.type === reason);
 
         if (availablePhrases.length === 0) {
-            availablePhrases = Phrases.filter(p => p.type === 'random');
+            availablePhrases = phrases.filter(p => p.type === 'random');
         }
 
         const charactersMap = new Map();
@@ -43,7 +52,6 @@ const CharacterManager = (function () {
             return false;
         }
 
-        // Получаем доступных персонажей
         let availableCharacters = getAvailableCharacters(reason);
 
         if (availableCharacters.length === 0) {
@@ -58,29 +66,39 @@ const CharacterManager = (function () {
 
         const randomIndex = Math.floor(Math.random() * availableCharacters.length);
         const selected = availableCharacters[randomIndex];
-        const character = Characters.find(c => c.id === selected.characterId);
+        const characters = (window.SyllableGame && SyllableGame.Characters) || window.Characters || [];
+        const character = characters.find(c => c.id === selected.characterId);
 
         return showCharacterWithDetails(character, selected.phrase, callback);
     }
 
     function showCharacterWithDetails(character, phrase, callback) {
+        if (!character) {
+            console.error('Character not found');
+            if (callback) setTimeout(callback, 100);
+            return false;
+        }
+
         isShowing = true;
         onHideCallback = callback;
 
-        // Добавляем в историю
         recentCharacters.push(character.id);
         if (recentCharacters.length > MAX_HISTORY_SIZE) {
             recentCharacters.shift();
         }
 
-        // Показываем изображение
-        const characterImg = ResourceManager.getImage(character.id);
-        if (characterImg) {
+        const characterImg = typeof ResourceManager !== 'undefined' ?
+            ResourceManager.getImage(character.id) : null;
+
+        if (characterImg && characterImg instanceof Image) {
             $('#characterImage').attr('src', characterImg.src);
+        } else {
+            $('#characterImage').attr('src', 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23ffd700"/><text x="50" y="70" font-size="50" text-anchor="middle" fill="white">👤</text></svg>');
         }
 
-        // Проигрываем аудио
-        const audio = ResourceManager.getAudio(phrase.id);
+        const audio = typeof ResourceManager !== 'undefined' ?
+            ResourceManager.getAudio(phrase.id) : null;
+
         if (audio) {
             audio.play().catch(e => console.log('Аудио не воспроизвелось:', e));
         }
@@ -88,26 +106,23 @@ const CharacterManager = (function () {
         const popup = $('#characterPopup');
         popup.removeClass('show from-right');
 
-        // Случайная сторона появления
         if (Math.random() > 0.5) {
             popup.addClass('show from-right');
         } else {
             popup.addClass('show');
         }
 
-        // Автоматическое скрытие
         if (currentHideTimeout) clearTimeout(currentHideTimeout);
         currentHideTimeout = setTimeout(() => {
             hideCharacter();
-        }, 3500);
+        }, AUTO_HIDE_DELAY);
 
-        // Safety таймер
         if (safetyTimeout) clearTimeout(safetyTimeout);
         safetyTimeout = setTimeout(() => {
             if ($('#characterPopup').hasClass('show')) {
                 hideCharacter();
             }
-        }, 5000);
+        }, SAFETY_TIMEOUT);
 
         return true;
     }
@@ -130,7 +145,11 @@ const CharacterManager = (function () {
         isShowing = false;
 
         if (callback) {
-            callback();
+            try {
+                callback();
+            } catch (e) {
+                console.error('Error in character callback:', e);
+            }
         }
     }
 
@@ -153,7 +172,8 @@ const CharacterManager = (function () {
         isShowing = false;
     }
 
-    init();
+    // Инициализация при загрузке
+    setTimeout(init, 100);
 
     return {
         showCharacter,
@@ -163,3 +183,5 @@ const CharacterManager = (function () {
         manualHideCharacter
     };
 })();
+
+window.SyllableCharacterManager = SyllableCharacterManager;

@@ -65,8 +65,8 @@ $(document).ready(function() {
         $('#gameWrapper').css('opacity', '1');
 
         // Запуск таймера случайных персонажей
-        if (typeof CharacterManager !== 'undefined') {
-            CharacterManager.startRandomTimer();
+        if (typeof SyllableCharacterManager !== 'undefined') {
+            SyllableCharacterManager.startRandomTimer();
         }
 
         // Проверяем поддержку озвучки
@@ -228,8 +228,8 @@ $(document).ready(function() {
             GameState.resetGame();
         }
 
-        if (typeof CharacterManager !== 'undefined') {
-            CharacterManager.resetHistory();
+        if (typeof SyllableCharacterManager !== 'undefined') {
+            SyllableCharacterManager.resetHistory();
         }
 
         updateVoiceButtons();
