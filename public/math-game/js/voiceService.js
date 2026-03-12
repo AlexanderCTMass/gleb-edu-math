@@ -1,5 +1,11 @@
 // ========== СЕРВИС ДЛЯ МАТЕМАТИЧЕСКОЙ ИГРЫ ==========
 const MathVoiceService = (function() {
+    // Проверяем, что BaseVoiceService доступен
+    if (typeof BaseVoiceService === 'undefined') {
+        console.error('BaseVoiceService not found!');
+        return null;
+    }
+
     // Создаем экземпляр базового сервиса
     const base = BaseVoiceService.create('mathGame', {
         // Получение состояний
@@ -32,8 +38,19 @@ const MathVoiceService = (function() {
         },
         onStopSpeaking: () => {
             $('#speakButton').removeClass('speaking');
+        },
+        onVoiceToggle: (enabled) => {
+            // Синхронизируем с GameState
+            if (typeof GameState !== 'undefined') {
+                GameState.update('voiceEnabled', enabled);
+            }
         }
     });
+
+    if (!base) {
+        console.error('Failed to create base voice service');
+        return null;
+    }
 
     // ========== СПЕЦИАЛИЗИРОВАННЫЕ МЕТОДЫ ==========
 
@@ -64,6 +81,11 @@ const MathVoiceService = (function() {
         text = variants[counters.correct % variants.length];
 
         return base.queueSpeech(text);
+    }
+
+    function speakWrongAnswer() {
+        if (!base.isVoiceEnabled()) return false;
+        return base.speakWrong();
     }
 
     function speakNumberComposition(number, floors) {
@@ -130,13 +152,15 @@ const MathVoiceService = (function() {
 
     // ========== ПУБЛИЧНЫЙ API ==========
 
-    return {
-        // Базовые методы
+    // Проверяем, что все необходимые методы существуют
+    const publicAPI = {
+        // Базовые методы из base
         ...base,
 
         // Специализированные методы
         speakQuestion,
         speakCorrectAnswer,
+        speakWrongAnswer,
         speakNumberComposition,
 
         // Алиасы для обратной совместимости
@@ -146,9 +170,58 @@ const MathVoiceService = (function() {
         // Переопределяем методы, если нужно
         resetCounters: () => {
             base.resetCounters();
-            // Дополнительная логика для математической игры
+            console.log('MathVoiceService counters reset');
+        },
+
+        // Дополнительные методы для совместимости с основным кодом
+        toggleVoice: () => {
+            const newState = base.toggleVoice();
+            if (typeof GameState !== 'undefined') {
+                GameState.update('voiceEnabled', newState);
+            }
+            return newState;
+        },
+
+        toggleAutoVoice: () => {
+            const newState = base.toggleAutoVoice();
+            if (typeof GameState !== 'undefined') {
+                GameState.update('autoVoice', newState);
+            }
+            return newState;
+        },
+
+        stopSpeaking: () => {
+            base.stopSpeaking();
+        },
+
+        isSupported: () => {
+            return base.isSupported();
+        },
+
+        getBrowserInfo: () => {
+            return base.getBrowserInfo();
         }
     };
+
+    // Проверяем наличие всех методов
+    const requiredMethods = ['queueSpeech', 'stopSpeaking', 'isVoiceEnabled',
+        'isAutoVoiceEnabled', 'toggleVoice', 'toggleAutoVoice',
+        'speakCorrect', 'speakWrong', 'resetCounters',
+        'onQueueComplete', 'isSupported', 'getBrowserInfo'];
+
+    for (const method of requiredMethods) {
+        if (typeof publicAPI[method] === 'undefined') {
+            console.error(`MathVoiceService missing required method: ${method}`);
+        }
+    }
+
+    return publicAPI;
 })();
 
+// Глобальная переменная для обратной совместимости
 window.MathVoiceService = MathVoiceService;
+
+// Дополнительная проверка при загрузке
+if (typeof window.MathVoiceService === 'undefined') {
+    console.error('MathVoiceService failed to initialize');
+}

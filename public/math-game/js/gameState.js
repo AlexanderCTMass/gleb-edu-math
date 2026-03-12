@@ -3,6 +3,9 @@ const GameState = (function() {
     // Ключ для localStorage
     const STORAGE_KEY = 'mathGameState';
 
+    // Константы
+    const DEFAULT_MIN_INTERVAL_BETWEEN_CHARACTERS = 8000;
+
     let state = {
         currentNum: 2,
         currentLevel: 0,
@@ -18,11 +21,11 @@ const GameState = (function() {
         lastWrongFloor: null,
         lastWrongSide: null,
         lastCharacterTime: 0,
-        minIntervalBetweenCharacters: 8000,
+        minIntervalBetweenCharacters: DEFAULT_MIN_INTERVAL_BETWEEN_CHARACTERS,
         dragActive: false,
         // Настройки озвучки
-        voiceEnabled: true,  // Включена ли озвучка
-        autoVoice: true      // Автоматическая озвучка вопросов
+        voiceEnabled: true,
+        autoVoice: true
     };
 
     const listeners = [];
@@ -35,6 +38,11 @@ const GameState = (function() {
                 const parsed = JSON.parse(saved);
                 state = { ...state, ...parsed };
                 console.log('Game state loaded from storage:', state);
+
+                // Синхронизируем с VoiceCore
+                if (typeof VoiceCore !== 'undefined') {
+                    VoiceCore.syncWithGameState(state.voiceEnabled);
+                }
             }
         } catch (e) {
             console.error('Failed to load game state:', e);
@@ -44,7 +52,6 @@ const GameState = (function() {
     // Сохранение состояния в localStorage
     function saveToStorage() {
         try {
-            // Сохраняем только нужные поля (исключаем функции и временные данные)
             const stateToSave = {
                 currentNum: state.currentNum,
                 currentLevel: state.currentLevel,
@@ -71,8 +78,14 @@ const GameState = (function() {
     loadFromStorage();
 
     function notifyListeners() {
-        listeners.forEach(callback => callback(state));
-        saveToStorage(); // Сохраняем при каждом изменении
+        listeners.forEach(callback => {
+            try {
+                callback(state);
+            } catch (e) {
+                console.error('Error in state listener:', e);
+            }
+        });
+        saveToStorage();
     }
 
     return {
@@ -91,6 +104,16 @@ const GameState = (function() {
 
         update: function(prop, value) {
             state[prop] = value;
+
+            // Синхронизируем с VoiceCore при изменении voiceEnabled
+            if (prop === 'voiceEnabled' && typeof VoiceCore !== 'undefined') {
+                VoiceCore.syncWithGameState(value);
+                // Отправляем событие для синхронизации с VoiceCore
+                window.dispatchEvent(new CustomEvent('voiceStateChanged', {
+                    detail: { enabled: value }
+                }));
+            }
+
             notifyListeners();
         },
 
@@ -115,6 +138,18 @@ const GameState = (function() {
         // Сброс всей игры (начать сначала)
         resetGame: function() {
             console.log('Resetting game completely');
+
+            // Очищаем кэш аудио в VoiceCore
+            if (typeof VoiceCore !== 'undefined') {
+                VoiceCore.clearCache();
+                VoiceCore._resetQueue();
+            }
+
+            // Очищаем ресурсы ResourceManager
+            if (typeof ResourceManager !== 'undefined') {
+                ResourceManager.clearGameResources();
+            }
+
             state = {
                 currentNum: 2,
                 currentLevel: 0,
@@ -130,13 +165,20 @@ const GameState = (function() {
                 lastWrongFloor: null,
                 lastWrongSide: null,
                 lastCharacterTime: 0,
-                minIntervalBetweenCharacters: 8000,
+                minIntervalBetweenCharacters: DEFAULT_MIN_INTERVAL_BETWEEN_CHARACTERS,
                 dragActive: false,
                 voiceEnabled: true,
                 autoVoice: true
             };
+
             // Очищаем localStorage
             localStorage.removeItem(STORAGE_KEY);
+
+            // Синхронизируем VoiceCore
+            if (typeof VoiceCore !== 'undefined') {
+                VoiceCore.syncWithGameState(true);
+            }
+
             notifyListeners();
             return state;
         },
@@ -175,6 +217,15 @@ const GameState = (function() {
         // Методы для управления озвучкой
         toggleVoice: function() {
             state.voiceEnabled = !state.voiceEnabled;
+
+            // Синхронизируем с VoiceCore
+            if (typeof VoiceCore !== 'undefined') {
+                VoiceCore.syncWithGameState(state.voiceEnabled);
+                window.dispatchEvent(new CustomEvent('voiceStateChanged', {
+                    detail: { enabled: state.voiceEnabled }
+                }));
+            }
+
             notifyListeners();
             return state.voiceEnabled;
         },
@@ -188,6 +239,13 @@ const GameState = (function() {
         // Полная очистка сохранения
         clearStorage: function() {
             localStorage.removeItem(STORAGE_KEY);
+            if (typeof VoiceCore !== 'undefined') {
+                VoiceCore.clearCache();
+                VoiceCore._resetQueue();
+            }
+            if (typeof ResourceManager !== 'undefined') {
+                ResourceManager.clearAll();
+            }
             console.log('Storage cleared');
         }
     };

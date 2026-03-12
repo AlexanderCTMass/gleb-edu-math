@@ -3,25 +3,30 @@ const VoiceCore = (function() {
     // Конфигурация
     const API_URL = '/api/tts';
 
+    // Константы
+    const CACHE_MAX_SIZE = 50;
+    const QUEUE_DELAY = 50;
+    const WORD_DURATION_MS = 400;
+
     // Состояние
     let isSpeaking = false;
     let currentAudio = null;
     let audioContext = null;
     let currentUtterance = null;
-    let currentGameId = null; // ID игры, которой принадлежит текущая озвучка
+    let currentGameId = null;
 
     // Очередь озвучки
     let speechQueue = [];
     let isProcessingQueue = false;
     let onQueueCompleteCallback = null;
 
-    // Кэш для уже загруженных аудио
-    const audioCache = new Map();
+    // Кэш для уже загруженных аудио (с частотой использования)
+    const audioCache = new Map(); // key -> {data, hits, lastUsed}
 
     // Определяем тип браузера и доступные API
     const browserInfo = {
         isYandexBrowser: /YaBrowser/i.test(navigator.userAgent),
-        hasYandexSpeaker: !!(window.external && window.external.GetSpeaker),
+        hasYandexSpeaker: !!(window.external && typeof window.external.GetSpeaker === 'function'),
         hasSpeechSynthesis: !!window.speechSynthesis,
         hasWebAudio: !!(window.AudioContext || window.webkitAudioContext)
     };
@@ -37,6 +42,8 @@ const VoiceCore = (function() {
 
     function setVoiceState(enabled) {
         localStorage.setItem('voiceEnabled', enabled);
+        // Dispatch события для синхронизации с GameState
+        window.dispatchEvent(new CustomEvent('voiceStateChanged', { detail: { enabled } }));
     }
 
     function isVoiceEnabled() {
@@ -50,6 +57,13 @@ const VoiceCore = (function() {
             console.log('🎤 Яндекс.Браузер detected, using built-in Alice');
         }
 
+        // Слушаем события от GameState
+        window.addEventListener('voiceStateChanged', (e) => {
+            if (e.detail && typeof e.detail.enabled !== 'undefined') {
+                setVoiceState(e.detail.enabled);
+            }
+        });
+
         document.addEventListener('click', initAudioContext, { once: true });
         document.addEventListener('touchstart', initAudioContext, { once: true });
     }
@@ -59,7 +73,7 @@ const VoiceCore = (function() {
             try {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 if (audioContext.state === 'suspended') {
-                    audioContext.resume();
+                    audioContext.resume().catch(console.warn);
                 }
             } catch (e) {
                 console.error('Failed to initialize AudioContext:', e);
@@ -71,7 +85,7 @@ const VoiceCore = (function() {
 
     function queueSpeech(text, options = {}) {
         if (!isVoiceEnabled() && !options.force) {
-            if (options.onEnd) setTimeout(options.onEnd, 10);
+            if (options.onEnd) safeCallback(options.onEnd);
             return false;
         }
 
@@ -96,7 +110,7 @@ const VoiceCore = (function() {
             if (speechQueue.length === 0 && onQueueCompleteCallback) {
                 const callback = onQueueCompleteCallback;
                 onQueueCompleteCallback = null;
-                setTimeout(callback, 100);
+                safeCallback(callback, 100);
             }
             return;
         }
@@ -106,27 +120,28 @@ const VoiceCore = (function() {
 
         stopCurrentSpeech();
 
-        setTimeout(() => {
+        safeCallback(() => {
             trySpeak(next.text, {
                 ...next.options,
                 onEnd: () => {
                     console.log(`Speech ended for game: ${next.options.gameId}`);
                     isProcessingQueue = false;
-                    if (next.options.onEnd) next.options.onEnd();
+                    if (next.options.onEnd) safeCallback(next.options.onEnd);
                     processQueue();
                 },
                 onError: (error) => {
                     console.warn('Speech error (handled):', error?.error || error);
                     isProcessingQueue = false;
-                    if (next.options.onError) next.options.onError(error);
-                    if (next.options.onEnd) next.options.onEnd();
+                    if (next.options.onError) safeCallback(() => next.options.onError(error));
+                    if (next.options.onEnd) safeCallback(next.options.onEnd);
                     processQueue();
                 }
             });
-        }, 50);
+        }, QUEUE_DELAY);
     }
 
     function stopCurrentSpeech() {
+        // Остановка Web Speech
         if (window.speechSynthesis) {
             try {
                 window.speechSynthesis.cancel();
@@ -135,6 +150,7 @@ const VoiceCore = (function() {
             }
         }
 
+        // Остановка аудио
         if (currentAudio) {
             try {
                 if (currentAudio.stop && typeof currentAudio.stop === 'function') {
@@ -149,6 +165,19 @@ const VoiceCore = (function() {
             currentAudio = null;
         }
 
+        // Остановка Яндекс.Алисы
+        if (browserInfo.hasYandexSpeaker) {
+            try {
+                const speaker = window.external.GetSpeaker();
+                if (speaker && typeof speaker.Stop === 'function') {
+                    speaker.Stop();
+                }
+            } catch (e) {
+                console.warn('Error stopping Yandex speaker:', e);
+            }
+        }
+
+        // Закрытие AudioContext
         if (audioContext && audioContext.state !== 'closed') {
             try {
                 audioContext.close().catch(console.warn);
@@ -164,14 +193,11 @@ const VoiceCore = (function() {
 
     function stopSpeaking(gameId) {
         if (gameId) {
-            // Останавливаем только если текущая озвучка принадлежит этой игре
             if (isSpeaking && currentGameId === gameId) {
                 stopCurrentSpeech();
             }
-            // Очищаем очередь для этой игры
             clearQueueForGame(gameId);
         } else {
-            // Полная остановка
             stopCurrentSpeech();
             speechQueue = [];
             isProcessingQueue = false;
@@ -190,13 +216,32 @@ const VoiceCore = (function() {
     // ========== API ДЛЯ ЯНДЕКС.БРАУЗЕРА ==========
 
     function trySpeak(text, options) {
+        // Проверяем поддержку браузера
+        if (!isAnySpeechSupported()) {
+            console.warn('No speech synthesis supported');
+            if (options.onError) options.onError(new Error('No speech supported'));
+            if (options.onEnd) options.onEnd();
+            return;
+        }
+
         if (isBuiltInAliceAvailable()) {
             if (speakWithBuiltInAlice(text, options)) {
                 return;
             }
         }
 
-        speakWithCloudAPI(text, options);
+        // Пробуем облачное API только если есть поддержка AudioContext
+        if (browserInfo.hasWebAudio) {
+            speakWithCloudAPI(text, options);
+        } else {
+            speakWithWebSpeech(text, options);
+        }
+    }
+
+    function isAnySpeechSupported() {
+        return browserInfo.hasYandexSpeaker ||
+            browserInfo.hasWebAudio ||
+            browserInfo.hasSpeechSynthesis;
     }
 
     function speakWithBuiltInAlice(text, options = {}) {
@@ -205,25 +250,39 @@ const VoiceCore = (function() {
         }
 
         try {
-            if (options.onStart) options.onStart();
+            const speaker = window.external.GetSpeaker();
+
+            // Проверяем наличие необходимых методов
+            if (!speaker || typeof speaker.Speak !== 'function') {
+                return false;
+            }
+
+            if (options.onStart) safeCallback(options.onStart);
 
             currentGameId = options.gameId || null;
 
-            const speaker = window.external.GetSpeaker();
-            speaker.Rate = options.rate || 1.0;
-            speaker.Volume = options.volume || 100;
-            speaker.Voice = 'Alice';
+            // Устанавливаем параметры, если они поддерживаются
+            if (typeof speaker.Rate !== 'undefined') {
+                speaker.Rate = options.rate || 1.0;
+            }
+            if (typeof speaker.Volume !== 'undefined') {
+                speaker.Volume = options.volume || 100;
+            }
+            if (typeof speaker.Voice !== 'undefined') {
+                speaker.Voice = 'Alice';
+            }
+
             speaker.Speak(text);
 
             isSpeaking = true;
 
             const wordCount = text.split(' ').length;
-            const duration = Math.max(1000, wordCount * 400);
+            const duration = Math.max(1000, wordCount * WORD_DURATION_MS);
 
             setTimeout(() => {
                 isSpeaking = false;
                 currentGameId = null;
-                if (options.onEnd) options.onEnd();
+                if (options.onEnd) safeCallback(options.onEnd);
             }, duration);
 
             return true;
@@ -234,7 +293,13 @@ const VoiceCore = (function() {
     }
 
     function isBuiltInAliceAvailable() {
-        return browserInfo.isYandexBrowser && browserInfo.hasYandexSpeaker;
+        try {
+            return browserInfo.isYandexBrowser &&
+                browserInfo.hasYandexSpeaker &&
+                window.external.GetSpeaker() !== null;
+        } catch (e) {
+            return false;
+        }
     }
 
     // ========== ОБЛАЧНОЕ API ==========
@@ -242,16 +307,24 @@ const VoiceCore = (function() {
     function speakWithCloudAPI(text, options) {
         stopCurrentSpeech();
 
-        if (options.onStart) options.onStart();
+        if (options.onStart) safeCallback(options.onStart);
         currentGameId = options.gameId || null;
 
+        // Проверяем кэш
         if (audioCache.has(text)) {
             console.log('Using cached audio for:', text.substring(0, 30));
-            playAudioData(audioCache.get(text), options);
+            const cached = audioCache.get(text);
+            cached.hits++;
+            cached.lastUsed = Date.now();
+            playAudioData(cached.data, options);
             return;
         }
 
         console.log('Requesting TTS from server:', text.substring(0, 30));
+
+        // Таймаут для fetch
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         fetch(API_URL, {
             method: 'POST',
@@ -263,9 +336,11 @@ const VoiceCore = (function() {
                 voice: 'alena',
                 emotion: 'good',
                 speed: options.rate || 1.0
-            })
+            }),
+            signal: controller.signal
         })
             .then(response => {
+                clearTimeout(timeoutId);
                 if (!response.ok) {
                     return response.json().then(err => {
                         throw new Error(err.error || `HTTP error! status: ${response.status}`);
@@ -275,27 +350,58 @@ const VoiceCore = (function() {
             })
             .then(data => {
                 if (data.audio) {
-                    if (audioCache.size > 50) {
-                        const firstKey = audioCache.keys().next().value;
-                        audioCache.delete(firstKey);
+                    // Кэшируем с информацией о частоте использования
+                    if (audioCache.size >= CACHE_MAX_SIZE) {
+                        evictLeastUsed();
                     }
-                    audioCache.set(text, data.audio);
+                    audioCache.set(text, {
+                        data: data.audio,
+                        hits: 1,
+                        lastUsed: Date.now()
+                    });
                     playBase64Audio(data.audio, options);
                 } else {
                     throw new Error('No audio in response');
                 }
             })
             .catch(error => {
+                clearTimeout(timeoutId);
                 console.error('Cloud TTS error:', error);
-                speakWithWebSpeech(text, options);
+                // Пробуем web speech как запасной вариант
+                if (browserInfo.hasSpeechSynthesis) {
+                    speakWithWebSpeech(text, options);
+                } else {
+                    if (options.onError) options.onError(error);
+                    if (options.onEnd) options.onEnd();
+                }
             });
+    }
+
+    function evictLeastUsed() {
+        let leastUsedKey = null;
+        let leastUsedHits = Infinity;
+        let oldestTime = Infinity;
+
+        for (const [key, value] of audioCache.entries()) {
+            // Комбинированная метрика: меньше хитов или старше
+            if (value.hits < leastUsedHits ||
+                (value.hits === leastUsedHits && value.lastUsed < oldestTime)) {
+                leastUsedHits = value.hits;
+                oldestTime = value.lastUsed;
+                leastUsedKey = key;
+            }
+        }
+
+        if (leastUsedKey) {
+            audioCache.delete(leastUsedKey);
+        }
     }
 
     // ========== WEB SPEECH API ==========
 
     function speakWithWebSpeech(text, options = {}) {
         if (!window.speechSynthesis) {
-            if (options.onEnd) setTimeout(options.onEnd, 10);
+            if (options.onEnd) safeCallback(options.onEnd);
             return false;
         }
 
@@ -303,7 +409,7 @@ const VoiceCore = (function() {
             window.speechSynthesis.cancel();
         } catch (e) {}
 
-        if (options.onStart) options.onStart();
+        if (options.onStart) safeCallback(options.onStart);
         currentGameId = options.gameId || null;
 
         const utterance = new SpeechSynthesisUtterance(text);
@@ -318,7 +424,7 @@ const VoiceCore = (function() {
             isSpeaking = false;
             currentUtterance = null;
             currentGameId = null;
-            if (options.onEnd) options.onEnd();
+            if (options.onEnd) safeCallback(options.onEnd);
         };
 
         utterance.onerror = (event) => {
@@ -330,8 +436,8 @@ const VoiceCore = (function() {
             isSpeaking = false;
             currentUtterance = null;
             currentGameId = null;
-            if (options.onError) options.onError(event);
-            if (options.onEnd) options.onEnd();
+            if (options.onError) safeCallback(() => options.onError(event));
+            if (options.onEnd) safeCallback(options.onEnd);
         };
 
         try {
@@ -339,11 +445,33 @@ const VoiceCore = (function() {
             isSpeaking = true;
         } catch (e) {
             console.error('WebSpeech speak error:', e);
-            if (options.onError) options.onError(e);
-            if (options.onEnd) options.onEnd();
+            if (options.onError) safeCallback(() => options.onError(e));
+            if (options.onEnd) safeCallback(options.onEnd);
         }
 
         return true;
+    }
+
+    // ========== БЕЗОПАСНЫЙ ВЫЗОВ КОЛБЭКОВ ==========
+
+    function safeCallback(callback, delay = 0) {
+        if (typeof callback !== 'function') return;
+
+        if (delay > 0) {
+            setTimeout(() => {
+                try {
+                    callback();
+                } catch (e) {
+                    console.error('Error in safeCallback:', e);
+                }
+            }, delay);
+        } else {
+            try {
+                callback();
+            } catch (e) {
+                console.error('Error in safeCallback:', e);
+            }
+        }
     }
 
     // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
@@ -369,7 +497,7 @@ const VoiceCore = (function() {
                         isSpeaking = false;
                         currentAudio = null;
                         currentGameId = null;
-                        if (options.onEnd) options.onEnd();
+                        if (options.onEnd) safeCallback(options.onEnd);
                     };
 
                     source.start();
@@ -384,9 +512,13 @@ const VoiceCore = (function() {
             }
         } catch (error) {
             console.error('Play error:', error);
-            if (options.onError) options.onError(error);
-            if (options.onEnd) options.onEnd();
+            if (options.onError) safeCallback(() => options.onError(error));
+            if (options.onEnd) safeCallback(options.onEnd);
         }
+    }
+
+    function playAudioData(audioData, options) {
+        playBase64Audio(audioData, options);
     }
 
     function playAsAudioElement(base64Data, options) {
@@ -402,7 +534,7 @@ const VoiceCore = (function() {
             isSpeaking = false;
             currentAudio = null;
             currentGameId = null;
-            if (options.onEnd) options.onEnd();
+            if (options.onEnd) safeCallback(options.onEnd);
         };
 
         audio.onerror = (e) => {
@@ -410,25 +542,21 @@ const VoiceCore = (function() {
             isSpeaking = false;
             currentAudio = null;
             currentGameId = null;
-            if (options.onError) options.onError(e);
-            if (options.onEnd) options.onEnd();
+            if (options.onError) safeCallback(() => options.onError(e));
+            if (options.onEnd) safeCallback(options.onEnd);
         };
 
         audio.play().catch(e => {
             console.error('Audio play error:', e);
-            if (options.onError) options.onError(e);
-            if (options.onEnd) options.onEnd();
+            if (options.onError) safeCallback(() => options.onError(e));
+            if (options.onEnd) safeCallback(options.onEnd);
         });
-    }
-
-    function playAudioData(audioData, options) {
-        playBase64Audio(audioData, options);
     }
 
     function isSupported() {
         return isBuiltInAliceAvailable() ||
-            !!(window.AudioContext || window.webkitAudioContext) ||
-            !!window.speechSynthesis;
+            browserInfo.hasWebAudio ||
+            browserInfo.hasSpeechSynthesis;
     }
 
     function onQueueComplete(callback) {
@@ -467,7 +595,12 @@ const VoiceCore = (function() {
         // Очистка по игре
         clearQueueForGame,
 
-        // Внутренние методы
+        // Для синхронизации с GameState
+        syncWithGameState: (enabled) => {
+            setVoiceState(enabled);
+        },
+
+        // Внутренние методы (для отладки)
         _resetQueue: () => {
             stopCurrentSpeech();
             speechQueue = [];
@@ -475,7 +608,8 @@ const VoiceCore = (function() {
             onQueueCompleteCallback = null;
         },
         _getQueueLength: () => speechQueue.length,
-        _getCurrentGame: () => currentGameId
+        _getCurrentGame: () => currentGameId,
+        _getCacheSize: () => audioCache.size
     };
 })();
 

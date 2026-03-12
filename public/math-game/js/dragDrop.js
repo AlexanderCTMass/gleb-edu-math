@@ -8,22 +8,45 @@ const DragDropManager = (function() {
     // Колбэки для событий
     let onDropCallback = null;
 
+    // Обработчики для возможности их удаления
+    let handlers = {};
+
     function init(onDrop) {
         onDropCallback = onDrop;
 
-        $(document).on('mousedown', '.digit-item', startDragHandler);
-        $(document).on('mousemove', moveDragHandler);
-        $(document).on('mouseup', endDragHandler);
+        // Сохраняем обработчики для возможности удаления
+        handlers = {
+            mousedown: startDragHandler,
+            mousemove: moveDragHandler,
+            mouseup: endDragHandler,
+            mouseleave: mouseLeaveHandler,
+            touchstart: touchStartHandler,
+            touchmove: touchMoveHandler,
+            touchend: touchEndHandler
+        };
 
-        $(document).on('touchstart', '.digit-item', touchStartHandler);
-        $(document).on('touchmove', touchMoveHandler, { passive: false });
-        $(document).on('touchend', touchEndHandler);
+        $(document).on('mousedown', '.digit-item', handlers.mousedown);
+        $(document).on('mousemove', handlers.mousemove);
+        $(document).on('mouseup', handlers.mouseup);
+        $(document).on('touchstart', '.digit-item', handlers.touchstart);
+        $(document).on('touchmove', handlers.touchmove, { passive: false });
+        $(document).on('touchend', handlers.touchend);
+        $(document).on('mouseleave', handlers.mouseleave);
+    }
 
-        $(document).on('mouseleave', function() {
-            if (isDragging) {
-                cleanup();
-            }
-        });
+    function destroy() {
+        // Удаляем все обработчики
+        $(document).off('mousedown', '.digit-item', handlers.mousedown);
+        $(document).off('mousemove', handlers.mousemove);
+        $(document).off('mouseup', handlers.mouseup);
+        $(document).off('touchstart', '.digit-item', handlers.touchstart);
+        $(document).off('touchmove', handlers.touchmove);
+        $(document).off('touchend', handlers.touchend);
+        $(document).off('mouseleave', handlers.mouseleave);
+
+        // Очищаем состояние
+        cleanup();
+        onDropCallback = null;
     }
 
     function startDragHandler(e) {
@@ -64,6 +87,12 @@ const DragDropManager = (function() {
             e.preventDefault();
             const touch = e.originalEvent.changedTouches[0];
             endDrag(touch.pageX, touch.pageY);
+        }
+    }
+
+    function mouseLeaveHandler() {
+        if (isDragging) {
+            cleanup();
         }
     }
 
@@ -108,9 +137,12 @@ const DragDropManager = (function() {
 
         const target = findTarget(x, y);
 
-        if (target) {
-            if (onDropCallback) {
+        if (target && onDropCallback) {
+            // Используем try-catch для защиты от ошибок в колбэке
+            try {
                 onDropCallback(target, draggedDigit);
+            } catch (e) {
+                console.error('Error in drop callback:', e);
             }
 
             clone.css({
@@ -143,8 +175,10 @@ const DragDropManager = (function() {
                 duration: 300,
                 easing: 'easeOutBack',
                 complete: function() {
-                    clone.remove();
-                    clone = null;
+                    if (clone) {
+                        clone.remove();
+                        clone = null;
+                    }
                 }
             });
         } else if (clone) {
@@ -217,6 +251,7 @@ const DragDropManager = (function() {
 
     return {
         init,
+        destroy, // Добавляем метод для очистки
         createDigits
     };
 })();

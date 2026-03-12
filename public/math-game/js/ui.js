@@ -44,6 +44,10 @@ const CharacterManager = (function () {
     // Защита от множественных вызовов
     let isShowing = false;
 
+    // Константы
+    const AUTO_HIDE_DELAY = 3500;
+    const SAFETY_TIMEOUT = 5000;
+
     function init() {
         console.log('CharacterManager initialized');
         $('#characterPopup').on('click', function () {
@@ -57,13 +61,11 @@ const CharacterManager = (function () {
         const now = Date.now();
         const minInterval = GameState.getProp('minIntervalBetweenCharacters');
 
-        // Проверяем временной интервал (минимум 8 секунд между персонажами)
         if (now - lastTime <= minInterval) {
             console.log('Cannot show character - too soon');
             return false;
         }
 
-        // Проверяем, не был ли этот персонаж показан недавно
         if (recentCharacters.includes(characterId)) {
             console.log(`Character ${characterId} was shown recently, skipping`);
             return false;
@@ -141,7 +143,7 @@ const CharacterManager = (function () {
 
         if (callback) {
             console.log('Executing hide callback, wasManual:', wasManual);
-            callback();
+            safeCallback(callback);
         }
     }
 
@@ -153,11 +155,20 @@ const CharacterManager = (function () {
         }
     }
 
+    function safeCallback(callback) {
+        if (typeof callback === 'function') {
+            try {
+                callback();
+            } catch (e) {
+                console.error('Error in character callback:', e);
+            }
+        }
+    }
+
     function showCharacter(reason = 'correct', callback) {
-        // Защита от множественных вызовов
         if (isShowing) {
             console.log('Character already showing, skipping');
-            if (callback) setTimeout(callback, 100);
+            if (callback) safeCallback(callback);
             return false;
         }
 
@@ -176,17 +187,14 @@ const CharacterManager = (function () {
         wasManuallyClosed = false;
         isShowing = true;
 
-        // Получаем доступных персонажей
         let availableCharacters = getAvailableCharacters(reason);
 
-        // Если нет доступных, пробуем сбросить историю
         if (availableCharacters.length === 0) {
             console.log('No available characters, resetting history');
             recentCharacters = [];
             availableCharacters = getAvailableCharacters(reason);
         }
 
-        // Если все равно нет, берем любого
         if (availableCharacters.length === 0) {
             console.log('Taking any available character');
             let anyPhrases = Phrases.filter(p => p.type === reason);
@@ -197,7 +205,7 @@ const CharacterManager = (function () {
             if (anyPhrases.length === 0) {
                 console.log('No phrases available, calling callback directly');
                 isShowing = false;
-                if (callback) setTimeout(callback, 100);
+                if (callback) safeCallback(callback);
                 return false;
             }
 
@@ -214,11 +222,17 @@ const CharacterManager = (function () {
     }
 
     function showCharacterWithDetails(character, phrase, reason, callback) {
-        // Проверяем временной интервал
+        if (!character) {
+            console.error('Character not found for phrase:', phrase);
+            isShowing = false;
+            if (callback) safeCallback(callback);
+            return false;
+        }
+
         if (!canShowCharacter(character.id)) {
             console.log('Cannot show character due to time check');
             isShowing = false;
-            if (callback) setTimeout(callback, 100);
+            if (callback) safeCallback(callback);
             return false;
         }
 
@@ -228,48 +242,59 @@ const CharacterManager = (function () {
         GameState.update('lastCharacterTime', Date.now());
         addToRecent(character.id);
 
-        // Показываем изображение
+        // Показываем изображение с правильной обработкой
         const characterImg = ResourceManager.getImage(character.id);
-        if (characterImg) {
-            $('#characterImage').attr('src', characterImg.src);
+        const $characterImage = $('#characterImage');
+
+        if (characterImg && characterImg instanceof Image) {
+            $characterImage.attr('src', characterImg.src);
+        } else {
+            console.warn('Invalid image for character:', character.id);
+            // Устанавливаем заглушку
+            $characterImage.attr('src', 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23ffd700"/><text x="50" y="70" font-size="50" text-anchor="middle" fill="white">👤</text></svg>');
         }
 
-        // Проигрываем аудио (фразу персонажа)
+        // Проигрываем аудио
         const audio = ResourceManager.getAudio(phrase.id);
         if (audio) {
-            audio.play().catch(e => console.log('Аудио не воспроизвелось:', e));
+            audio.play().catch(e => {
+                console.log('Аудио не воспроизвелось:', e);
+                // Пробуем воспроизвести через голосовой движок как запасной вариант
+                if (typeof MathVoiceService !== 'undefined' && MathVoiceService.isVoiceEnabled()) {
+                    MathVoiceService.queueSpeech('', { silent: true }); // Заглушка
+                }
+            });
+        } else if (typeof MathVoiceService !== 'undefined' && MathVoiceService.isVoiceEnabled()) {
+            // Если нет аудиофайла, используем голосовой движок
+            MathVoiceService.queueSpeech('Молодец!', { rate: 0.9 });
         }
 
         const popup = $('#characterPopup');
         popup.removeClass('show from-right');
 
-        // Случайная сторона появления
         if (Math.random() > 0.5) {
             popup.addClass('show from-right');
         } else {
             popup.addClass('show');
         }
 
-        // Автоматическое скрытие через 3.5 секунды
         currentHideTimeout = setTimeout(() => {
             console.log('Auto-hide timeout triggered');
             hideCharacter();
-        }, 3500);
+        }, AUTO_HIDE_DELAY);
 
-        // Safety таймер
         safetyTimeout = setTimeout(() => {
             console.log('Safety timeout - forcing character hide');
             if ($('#characterPopup').hasClass('show')) {
                 hideCharacter();
             }
-        }, 5000);
+        }, SAFETY_TIMEOUT);
 
         return true;
     }
 
     function startRandomTimer() {
         setInterval(() => {
-            // 10% шанс каждые 30 секунд
             if (Math.random() < 0.1 && !isShowing) {
                 showCharacter('random');
             }

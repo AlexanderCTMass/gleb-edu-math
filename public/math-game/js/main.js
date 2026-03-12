@@ -1,5 +1,8 @@
 // ========== ГЛАВНЫЙ ФАЙЛ МАТЕМАТИЧЕСКОЙ ИГРЫ ==========
 $(document).ready(function() {
+    // Проверяем наличие всех необходимых сервисов
+    checkRequiredServices();
+
     // Проверяем, какой браузер используется
     const isYandexBrowser = /YaBrowser/i.test(navigator.userAgent);
 
@@ -8,6 +11,12 @@ $(document).ready(function() {
     }
 
     // Загрузка ресурсов
+    if (typeof ResourceManager === 'undefined') {
+        console.error('ResourceManager not found!');
+        $('#loadingStatus').text('Ошибка загрузки ресурсов');
+        return;
+    }
+
     ResourceManager.init(
         Characters,
         Phrases,
@@ -22,21 +31,48 @@ $(document).ready(function() {
         }
     );
 
+    function checkRequiredServices() {
+        const required = ['GameState', 'HouseManager', 'UIManager', 'CharacterManager'];
+        const missing = required.filter(service => typeof window[service] === 'undefined');
+
+        if (missing.length > 0) {
+            console.error('Missing required services:', missing);
+        }
+    }
+
     function startGame() {
-        UIManager.init();
-        GameLogic.init();
+        // Инициализация UI
+        if (typeof UIManager !== 'undefined') {
+            UIManager.init();
+        }
+
+        // Инициализация игровой логики
+        if (typeof GameLogic !== 'undefined') {
+            GameLogic.init();
+        }
+
         $('#gameWrapper').css('opacity', '1');
-        CharacterManager.startRandomTimer();
+
+        // Запуск таймера случайных персонажей
+        if (typeof CharacterManager !== 'undefined') {
+            CharacterManager.startRandomTimer();
+        }
 
         // Проверяем поддержку озвучки
-        if (!MathVoiceService.isSupported()) {
+        const voiceSupported = typeof MathVoiceService !== 'undefined' &&
+            MathVoiceService.isSupported &&
+            MathVoiceService.isSupported();
+
+        if (!voiceSupported) {
             console.log('No speech support');
             $('#speakButton').hide();
             $('#voiceToggleBtn').hide();
             $('#autoVoiceToggleBtn').hide();
         } else {
             // Показываем информацию об используемом голосе
-            const browserInfo = MathVoiceService.getBrowserInfo();
+            const browserInfo = MathVoiceService.getBrowserInfo ?
+                MathVoiceService.getBrowserInfo() : { isYandexBrowser: false, hasYandexSpeaker: false };
+
             if (browserInfo.isYandexBrowser && browserInfo.hasYandexSpeaker) {
                 UIManager.showMessage('Алиса готова помогать! 🎤', '#4caf50');
                 $('#voiceIcon').text('🎤');
@@ -46,25 +82,28 @@ $(document).ready(function() {
         }
 
         // Подписываемся на изменения состояния
-        GameState.subscribe((state) => {
-            if (state.currentLevel !== 0) {
-                // Не останавливаем автоматически, только если нужно
-                // MathVoiceService.stopSpeaking();
-            }
-            updateVoiceButtons();
-        });
+        if (typeof GameState !== 'undefined') {
+            GameState.subscribe((state) => {
+                updateVoiceButtons();
+            });
+        }
     }
 
     // Обновление состояния кнопок озвучки
     function updateVoiceButtons() {
+        if (typeof GameState === 'undefined') return;
+
         const state = GameState.get();
-        const browserInfo = MathVoiceService.getBrowserInfo();
+        const browserInfo = typeof MathVoiceService !== 'undefined' &&
+        MathVoiceService.getBrowserInfo ?
+            MathVoiceService.getBrowserInfo() :
+            { isYandexBrowser: false, hasYandexSpeaker: false };
 
         // Кнопка вкл/выкл озвучки
         if (state.voiceEnabled) {
             $('#voiceToggleBtn').removeClass('disabled');
             if (browserInfo.isYandexBrowser && browserInfo.hasYandexSpeaker) {
-                $('#voiceIcon').text('🎤'); // Иконка Алисы для Яндекс.Браузера
+                $('#voiceIcon').text('🎤');
             } else {
                 $('#voiceIcon').text('🔊');
             }
@@ -87,6 +126,7 @@ $(document).ready(function() {
 
     $('#option1, #option2, #option3').click(function() {
         if ($(this).hasClass('disabled')) return;
+        if (typeof GameState === 'undefined' || typeof GameLogic === 'undefined') return;
         if (GameState.getProp('currentLevel') === 0) return;
 
         const selectedValue = parseInt($(this).text());
@@ -94,6 +134,8 @@ $(document).ready(function() {
     });
 
     $('#speakButton').click(function() {
+        if (typeof MathVoiceService === 'undefined') return;
+
         if ($(this).hasClass('speaking')) {
             MathVoiceService.stopSpeaking();
             $(this).removeClass('speaking');
@@ -108,9 +150,9 @@ $(document).ready(function() {
     });
 
     $('#voiceToggleBtn').click(function() {
-        const newState = MathVoiceService.toggleVoice();
+        if (typeof MathVoiceService === 'undefined' || typeof GameState === 'undefined') return;
 
-        // Синхронизируем с GameState
+        const newState = MathVoiceService.toggleVoice();
         GameState.update('voiceEnabled', newState);
 
         if (!newState) {
@@ -118,25 +160,29 @@ $(document).ready(function() {
         }
 
         updateVoiceButtons();
-        UIManager.showMessage(
-            newState ? 'Озвучка включена' : 'Озвучка выключена',
-            newState ? '#4caf50' : '#f44336'
-        );
+        if (typeof UIManager !== 'undefined') {
+            UIManager.showMessage(
+                newState ? 'Озвучка включена' : 'Озвучка выключена',
+                newState ? '#4caf50' : '#f44336'
+            );
+        }
     });
 
     $('#autoVoiceToggleBtn').click(function() {
-        const newState = MathVoiceService.toggleAutoVoice();
+        if (typeof MathVoiceService === 'undefined' || typeof GameState === 'undefined') return;
 
-        // Синхронизируем с GameState
+        const newState = MathVoiceService.toggleAutoVoice();
         GameState.update('autoVoice', newState);
 
         updateVoiceButtons();
-        UIManager.showMessage(
-            newState ? 'Автоозвучка включена' : 'Автоозвучка выключена',
-            newState ? '#4caf50' : '#ff9800'
-        );
+        if (typeof UIManager !== 'undefined') {
+            UIManager.showMessage(
+                newState ? 'Автоозвучка включена' : 'Автоозвучка выключена',
+                newState ? '#4caf50' : '#ff9800'
+            );
+        }
 
-        if (newState && GameState.getProp('currentLevel') > 0) {
+        if (newState && GameState.getProp('currentLevel') > 0 && typeof GameLogic !== 'undefined') {
             setTimeout(() => GameLogic.speakCurrentQuestion(), 300);
         }
     });
@@ -153,13 +199,28 @@ $(document).ready(function() {
     $('#confirmReset').click(function() {
         $('#resetModal').fadeOut(200);
 
-        UIManager.showMessage('Игра начинается сначала!', '#ffd700');
-        MathVoiceService.stopSpeaking();
-        MathVoiceService.resetCounters();
-        GameState.resetGame();
-        CharacterManager.resetHistory();
+        if (typeof UIManager !== 'undefined') {
+            UIManager.showMessage('Игра начинается сначала!', '#ffd700');
+        }
+
+        if (typeof MathVoiceService !== 'undefined') {
+            MathVoiceService.stopSpeaking();
+            MathVoiceService.resetCounters();
+        }
+
+        if (typeof GameState !== 'undefined') {
+            GameState.resetGame();
+        }
+
+        if (typeof CharacterManager !== 'undefined') {
+            CharacterManager.resetHistory();
+        }
+
         updateVoiceButtons();
-        GameLogic.loadNumber(2);
+
+        if (typeof GameLogic !== 'undefined') {
+            GameLogic.loadNumber(2);
+        }
     });
 
     $('#resetModal').click(function(e) {
@@ -170,7 +231,18 @@ $(document).ready(function() {
 
     // Обработка переключения вкладок/страниц
     $(window).on('blur', function() {
-        // При уходе со страницы останавливаем озвучку
-        MathVoiceService.stopSpeaking();
+        if (typeof MathVoiceService !== 'undefined') {
+            MathVoiceService.stopSpeaking();
+        }
+    });
+
+    // Очистка при выгрузке страницы
+    $(window).on('beforeunload', function() {
+        if (typeof DragDropManager !== 'undefined' && DragDropManager.destroy) {
+            DragDropManager.destroy();
+        }
+        if (typeof MathVoiceService !== 'undefined') {
+            MathVoiceService.stopSpeaking();
+        }
     });
 });

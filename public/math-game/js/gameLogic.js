@@ -1,5 +1,13 @@
 // ========== ОСНОВНАЯ ИГРОВАЯ ЛОГИКА ==========
 const GameLogic = (function () {
+    // Константы
+    const CHARACTER_SHOW_INTERVAL = 4;
+    const AUTO_VOICE_DELAY = 300;
+    const CORRECT_ANSWER_TIMEOUT = 8000;
+    const INCORRECT_ANSWER_DELAY = 1500;
+    const INCORRECT_TIMEOUT = 5000;
+    const WRONG_HIGHLIGHT_DELAY = 500;
+
     let nextTimer = null;
     let currentOptions = [];
     let correctAnswer = null;
@@ -10,8 +18,6 @@ const GameLogic = (function () {
 
     // Счетчик правильных ответов для появления персонажа
     let correctAnswersCount = 0;
-    // Интервал появления персонажей (каждые 3-5 правильных ответов)
-    const CHARACTER_SHOW_INTERVAL = 4; // По умолчанию каждый 4-й правильный ответ
 
     function init() {
         loadNumber(GameState.getProp('currentNum'));
@@ -25,7 +31,9 @@ const GameLogic = (function () {
         $('#current-number').text(number);
 
         // Сбрасываем счетчики для нового числа
-        VoiceService.resetCounters();
+        if (typeof MathVoiceService !== 'undefined') {
+            MathVoiceService.resetCounters();
+        }
         correctAnswersCount = 0;
 
         setupLevel();
@@ -41,7 +49,6 @@ const GameLogic = (function () {
         isWaitingForCharacter = false;
         isWaitingForVoice = false;
 
-        // Для уровня 0
         if (state.currentLevel === 0) {
             $('#optionsContainer').hide();
             $('#nextCounter').hide();
@@ -82,20 +89,19 @@ const GameLogic = (function () {
             generateOptions();
             enableOptions();
 
-            // Автоматически озвучиваем вопрос
-            if (GameState.getProp('autoVoice')) {
-                setTimeout(() => speakCurrentQuestion(), 300);
+            if (GameState.getProp('autoVoice') && typeof MathVoiceService !== 'undefined') {
+                setTimeout(() => speakCurrentQuestion(), AUTO_VOICE_DELAY);
             }
         }
     }
 
-    // Озвучка текущего вопроса
     function speakCurrentQuestion() {
         const state = GameState.get();
         if (state.currentLevel === 0) return;
+        if (typeof MathVoiceService === 'undefined') return;
 
         const floor = state.floors[state.selectedFloorIndex];
-        VoiceService.speakQuestion(state.currentNum, floor.left, floor.right, unknownSide);
+        MathVoiceService.speakQuestion(state.currentNum, floor.left, floor.right, unknownSide);
     }
 
     function showNextButton() {
@@ -196,6 +202,8 @@ const GameLogic = (function () {
     }
 
     function showConfetti() {
+        if (typeof confetti === 'undefined') return;
+
         const duration = 1500;
         const animationEnd = Date.now() + duration;
         const defaults = {startVelocity: 30, spread: 360, ticks: 60, zIndex: 2000};
@@ -226,16 +234,28 @@ const GameLogic = (function () {
         }, 250);
     }
 
-    // Завершение правильного ответа
+    function safeCallback(callback) {
+        if (typeof callback === 'function') {
+            try {
+                callback();
+            } catch (e) {
+                console.error('Error in callback:', e);
+            }
+        }
+    }
+
     function completeCorrectAnswer() {
         console.log('Completing correct answer, moving to next floor');
         isWaitingForCharacter = false;
         isCorrectAnswerPending = false;
         isWaitingForVoice = false;
-        moveToNextFloor();
+
+        // Используем setTimeout для гарантии, что все состояния очищены
+        setTimeout(() => {
+            moveToNextFloor();
+        }, 50);
     }
 
-    // Завершение неправильного ответа
     function completeIncorrectAnswer() {
         console.log('Completing incorrect answer');
         isWaitingForCharacter = false;
@@ -243,7 +263,7 @@ const GameLogic = (function () {
         setTimeout(() => {
             $('.option-btn').removeClass('wrong-highlight');
             enableOptions();
-        }, 500);
+        }, WRONG_HIGHLIGHT_DELAY);
     }
 
     function selectOption(selectedValue) {
@@ -254,98 +274,83 @@ const GameLogic = (function () {
 
         const isCorrect = (selectedValue === correctAnswer);
 
-        // Блокируем кнопки
         disableOptions();
         isWaitingForCharacter = true;
 
         if (isCorrect) {
-            isCorrectAnswerPending = true;
-            correctAnswersCount++;
-
-            $(`.option-btn:contains('${selectedValue}')`).addClass('correct-highlight');
-            updateUnknownWithAnswer(selectedValue);
-            showConfetti();
-            GameState.incrementScore();
-
-            // ВСЕГДА озвучиваем правильный ответ (голосом)
-            if (GameState.getProp('voiceEnabled')) {
-                const floor = state.floors[state.selectedFloorIndex];
-                VoiceService.speakCorrectAnswer(state.currentNum, floor.left, floor.right, unknownSide);
-            }
-
-            // Решаем, показывать ли персонажа (каждые 3-5 правильных ответов)
-            const shouldShowCharacter = (correctAnswersCount % CHARACTER_SHOW_INTERVAL === 0);
-
-            if (shouldShowCharacter) {
-                console.log(`Showing character after ${correctAnswersCount} correct answers`);
-                CharacterManager.showCharacter('correct', function () {
-                    console.log('Character callback executed');
-
-                    // После исчезновения персонажа проверяем, не ждем ли мы еще озвучку
-                    if (GameState.getProp('voiceEnabled')) {
-                        isWaitingForVoice = true;
-                        VoiceService.onQueueComplete(function() {
-                            console.log('Voice queue completed after character');
-                            completeCorrectAnswer();
-                        });
-                    } else {
-                        completeCorrectAnswer();
-                    }
-                });
-            } else {
-                console.log(`No character this time (${correctAnswersCount} correct answers)`);
-                // Персонажа не показываем, просто ждем окончания озвучки
-                if (GameState.getProp('voiceEnabled')) {
-                    isWaitingForVoice = true;
-                    VoiceService.onQueueComplete(function() {
-                        console.log('Voice queue completed without character');
-                        completeCorrectAnswer();
-                    });
-                } else {
-                    completeCorrectAnswer();
-                }
-            }
-
-            // Таймер безопасности
-            setTimeout(() => {
-                if (isCorrectAnswerPending) {
-                    console.log('Correct answer timeout - forcing completion');
-                    completeCorrectAnswer();
-                }
-            }, 8000);
-
+            handleCorrectAnswer(selectedValue);
         } else {
-            // НЕПРАВИЛЬНЫЙ ОТВЕТ
-            $(`.option-btn:contains('${selectedValue}')`).addClass('wrong-highlight');
-
-            // Озвучиваем неправильный ответ (всегда)
-            if (GameState.getProp('voiceEnabled')) {
-                VoiceService.speakWrongAnswer();
-            }
-
-            // Персонажей при неправильных ответах НЕ показываем (или показываем редко)
-            // Можно раскомментировать, если хотите показывать иногда
-            // if (Math.random() < 0.3) { // 30% шанс
-            //     CharacterManager.showCharacter('incorrect', function () {
-            //         completeIncorrectAnswer();
-            //     });
-            // } else {
-            //     completeIncorrectAnswer();
-            // }
-
-            // Просто завершаем без персонажа
-            setTimeout(() => {
-                completeIncorrectAnswer();
-            }, 1500);
-
-            // Таймер безопасности
-            setTimeout(() => {
-                if (isWaitingForCharacter) {
-                    console.log('Incorrect answer timeout - forcing completion');
-                    completeIncorrectAnswer();
-                }
-            }, 5000);
+            handleIncorrectAnswer(selectedValue);
         }
+    }
+
+    function handleCorrectAnswer(selectedValue) {
+        isCorrectAnswerPending = true;
+        correctAnswersCount++;
+
+        $(`.option-btn:contains('${selectedValue}')`).addClass('correct-highlight');
+        updateUnknownWithAnswer(selectedValue);
+        showConfetti();
+        GameState.incrementScore();
+
+        // Озвучиваем правильный ответ
+        if (GameState.getProp('voiceEnabled') && typeof MathVoiceService !== 'undefined') {
+            const state = GameState.get();
+            const floor = state.floors[state.selectedFloorIndex];
+            MathVoiceService.speakCorrectAnswer(state.currentNum, floor.left, floor.right, unknownSide);
+        }
+
+        const shouldShowCharacter = (correctAnswersCount % CHARACTER_SHOW_INTERVAL === 0);
+
+        if (shouldShowCharacter && typeof CharacterManager !== 'undefined') {
+            console.log(`Showing character after ${correctAnswersCount} correct answers`);
+            CharacterManager.showCharacter('correct', function () {
+                console.log('Character callback executed');
+                handlePostCharacter();
+            });
+        } else {
+            console.log(`No character this time (${correctAnswersCount} correct answers)`);
+            handlePostCharacter();
+        }
+
+        // Таймер безопасности
+        setTimeout(() => {
+            if (isCorrectAnswerPending) {
+                console.log('Correct answer timeout - forcing completion');
+                completeCorrectAnswer();
+            }
+        }, CORRECT_ANSWER_TIMEOUT);
+    }
+
+    function handlePostCharacter() {
+        if (GameState.getProp('voiceEnabled') && typeof MathVoiceService !== 'undefined') {
+            isWaitingForVoice = true;
+            MathVoiceService.onQueueComplete(function() {
+                console.log('Voice queue completed');
+                completeCorrectAnswer();
+            });
+        } else {
+            completeCorrectAnswer();
+        }
+    }
+
+    function handleIncorrectAnswer(selectedValue) {
+        $(`.option-btn:contains('${selectedValue}')`).addClass('wrong-highlight');
+
+        if (GameState.getProp('voiceEnabled') && typeof MathVoiceService !== 'undefined') {
+            MathVoiceService.speakWrongAnswer();
+        }
+
+        setTimeout(() => {
+            completeIncorrectAnswer();
+        }, INCORRECT_ANSWER_DELAY);
+
+        setTimeout(() => {
+            if (isWaitingForCharacter) {
+                console.log('Incorrect answer timeout - forcing completion');
+                completeIncorrectAnswer();
+            }
+        }, INCORRECT_TIMEOUT);
     }
 
     function updateUnknownWithAnswer(answer) {
@@ -411,8 +416,8 @@ const GameLogic = (function () {
                 generateOptions();
                 enableOptions();
 
-                if (GameState.getProp('autoVoice')) {
-                    setTimeout(() => speakCurrentQuestion(), 500);
+                if (GameState.getProp('autoVoice') && typeof MathVoiceService !== 'undefined') {
+                    setTimeout(() => speakCurrentQuestion(), AUTO_VOICE_DELAY);
                 }
             }
 
@@ -479,7 +484,9 @@ const GameLogic = (function () {
                 GameState.nextNumber();
                 UIManager.showMessage(`Ура! Число ${GameState.getProp('currentNum') - 1} освоено! 👑 +1`, '#ffd700');
 
-                VoiceService.resetCounters();
+                if (typeof MathVoiceService !== 'undefined') {
+                    MathVoiceService.resetCounters();
+                }
                 correctAnswersCount = 0;
 
                 loadNumber(GameState.getProp('currentNum'));
