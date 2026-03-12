@@ -1,5 +1,5 @@
-// ========== СЕРВИС ОЗВУЧКИ С ПОДДЕРЖКОЙ АЛИСЫ В ЯНДЕКС.БРАУЗЕРЕ ==========
-const YandexVoiceService = (function() {
+// ========== УНИВЕРСАЛЬНЫЙ СЕРВИС ОЗВУЧКИ ==========
+const UnifiedVoiceService = (function() {
     // Конфигурация
     const API_URL = '/api/tts';
 
@@ -30,7 +30,54 @@ const YandexVoiceService = (function() {
         hasWebAudio: !!(window.AudioContext || window.webkitAudioContext)
     };
 
-    console.log('Browser info:', browserInfo);
+    console.log('UnifiedVoiceService browser info:', browserInfo);
+
+    // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+
+    // Получение состояния голоса из активной игры
+    function getVoiceState() {
+        // Проверяем, какая игра активна (можно определить по наличию глобальных объектов)
+        if (typeof SyllableGameState !== 'undefined' && SyllableGameState.get) {
+            return SyllableGameState.getProp('voiceEnabled');
+        }
+        if (typeof GameState !== 'undefined' && GameState.get) {
+            return GameState.getProp('voiceEnabled');
+        }
+        return true; // По умолчанию включено
+    }
+
+    function getAutoVoiceState() {
+        if (typeof SyllableGameState !== 'undefined' && SyllableGameState.get) {
+            return SyllableGameState.getProp('autoVoice');
+        }
+        if (typeof GameState !== 'undefined' && GameState.get) {
+            return GameState.getProp('autoVoice');
+        }
+        return true;
+    }
+
+    // Обновление состояния голоса в активной игре
+    function setVoiceState(enabled) {
+        if (typeof SyllableGameState !== 'undefined' && SyllableGameState.get) {
+            SyllableGameState.update('voiceEnabled', enabled);
+        }
+        if (typeof GameState !== 'undefined' && GameState.get) {
+            GameState.update('voiceEnabled', enabled);
+        }
+    }
+
+    function setAutoVoiceState(enabled) {
+        if (typeof SyllableGameState !== 'undefined' && SyllableGameState.get) {
+            SyllableGameState.update('autoVoice', enabled);
+        }
+        if (typeof GameState !== 'undefined' && GameState.get) {
+            GameState.update('autoVoice', enabled);
+        }
+    }
+
+    function isVoiceEnabled() {
+        return getVoiceState();
+    }
 
     // ========== ИНИЦИАЛИЗАЦИЯ ==========
 
@@ -54,10 +101,6 @@ const YandexVoiceService = (function() {
                 console.error('Failed to initialize AudioContext:', e);
             }
         }
-    }
-
-    function isVoiceEnabled() {
-        return GameState.getProp('voiceEnabled');
     }
 
     // ========== УПРАВЛЕНИЕ ОЧЕРЕДЬЮ ==========
@@ -384,9 +427,9 @@ const YandexVoiceService = (function() {
             !!window.speechSynthesis;
     }
 
-    // ========== ОСНОВНЫЕ МЕТОДЫ ОЗВУЧКИ ==========
+    // ========== ОСНОВНЫЕ МЕТОДЫ ДЛЯ МАТЕМАТИЧЕСКОЙ ИГРЫ ==========
 
-    function speakQuestion(number, left, right, unknownSide) {
+    function speakMathQuestion(number, left, right, unknownSide) {
         if (!isVoiceEnabled()) return false;
 
         questionCounter++;
@@ -424,7 +467,7 @@ const YandexVoiceService = (function() {
         return queueSpeech(text, { rate: 0.9 });
     }
 
-    function speakCorrectAnswer(number, left, right, unknownSide) {
+    function speakMathCorrectAnswer(number, left, right, unknownSide) {
         if (!isVoiceEnabled()) return false;
 
         correctCounter++;
@@ -459,7 +502,127 @@ const YandexVoiceService = (function() {
         return queueSpeech(text);
     }
 
-    function speakWrongAnswer() {
+    function speakMathNumberComposition(number, floors) {
+        if (!isVoiceEnabled()) return false;
+
+        let text = `Число ${number} можно получить разными способами. `;
+
+        const variants = floors.map(floor => `${floor.left} и ${floor.right}`).join(', ');
+        text += variants + '. ';
+
+        text += 'Давай попробуем решить примеры!';
+
+        return queueSpeech(text, {
+            rate: 0.9,
+            onStart: () => {
+                const $speakButton = $('#speakButton');
+                if ($speakButton.length) $speakButton.addClass('speaking');
+            },
+            onEnd: () => {
+                const $speakButton = $('#speakButton');
+                if ($speakButton.length) $speakButton.removeClass('speaking');
+            }
+        });
+    }
+
+    // ========== МЕТОДЫ ДЛЯ СЛОГОВОЙ ИГРЫ ==========
+
+    function speakSyllableQuestion(syllable, word, position) {
+        if (!isVoiceEnabled()) return false;
+
+        questionCounter++;
+        let text = '';
+
+        const variants = [
+            `Какой слог пропущен в слове ${word}?`,
+            `Найди пропущенный слог в слове ${word}`,
+            `Какой слог нужно добавить, чтобы получилось слово ${word}?`,
+            `В слове ${word} пропущен слог. Какой?`
+        ];
+        text = variants[questionCounter % variants.length];
+
+        return queueSpeech(text, { rate: 0.9 });
+    }
+
+    function speakSyllableCorrectAnswer(syllable, word) {
+        if (!isVoiceEnabled()) return false;
+
+        correctCounter++;
+
+        const praises = ['Верно!', 'Правильно!', 'Молодец!', 'Отлично!', 'Здорово!'];
+        const praise = praises[correctCounter % praises.length];
+
+        const variants = [
+            `${praise} Слог "${syllable}" - правильный ответ!`,
+            `${praise} Ты правильно выбрал слог "${syllable}" в слове ${word}`,
+            `${praise} "${syllable}" - верно!`
+        ];
+
+        const text = variants[correctCounter % variants.length];
+        return queueSpeech(text);
+    }
+
+    function speakSyllableWrongAnswer(correctSyllable) {
+        if (!isVoiceEnabled()) return false;
+
+        wrongCounter++;
+
+        const variants = [
+            'Попробуй другой слог',
+            'Не угадал, попробуй ещё раз',
+            'Почти, давай подумаем вместе',
+            'Этот слог не подходит, попробуй другой',
+            `Нет, это не "${correctSyllable}"?`
+        ];
+
+        const text = variants[wrongCounter % variants.length];
+        return queueSpeech(text);
+    }
+
+    function speakSyllableLearning(syllable, word) {
+        if (!isVoiceEnabled()) return false;
+
+        const variants = [
+            `Слог "${syllable}" встречается в слове ${word}`,
+            `Послушай: "${syllable}" - ${word}`,
+            `${word} - этот слог "${syllable}"`,
+            `Запомни: слог "${syllable}" есть в слове ${word}`
+        ];
+
+        const text = variants[questionCounter % variants.length];
+
+        return queueSpeech(text, {
+            rate: 0.8,
+            onStart: () => {
+                const $speakButton = $('#syllableSpeakButton');
+                if ($speakButton.length) $speakButton.addClass('speaking');
+            },
+            onEnd: () => {
+                const $speakButton = $('#syllableSpeakButton');
+                if ($speakButton.length) $speakButton.removeClass('speaking');
+            }
+        });
+    }
+
+    // ========== УНИВЕРСАЛЬНЫЕ МЕТОДЫ ==========
+
+    function speakText(text, options = {}) {
+        if (!isVoiceEnabled()) return false;
+        return queueSpeech(text, options);
+    }
+
+    function speakCorrect() {
+        if (!isVoiceEnabled()) return false;
+
+        correctCounter++;
+
+        const praises = ['Верно!', 'Правильно!', 'Молодец!', 'Отлично!', 'Здорово!', 'Супер!'];
+        const text = praises[correctCounter % praises.length];
+
+        return queueSpeech(text);
+    }
+
+    function speakWrong() {
         if (!isVoiceEnabled()) return false;
 
         wrongCounter++;
@@ -476,21 +639,18 @@ const YandexVoiceService = (function() {
         return queueSpeech(text);
     }
 
-    function speakNumberComposition(number, floors) {
-        if (!isVoiceEnabled()) return false;
+    // ========== УПРАВЛЕНИЕ ==========
 
-        let text = `Число ${number} можно получить разными способами. `;
+    function toggleVoice() {
+        const newState = !getVoiceState();
+        setVoiceState(newState);
+        return newState;
+    }
 
-        const variants = floors.map(floor => `${floor.left} и ${floor.right}`).join(', ');
-        text += variants + '. ';
-
-        text += 'Давай попробуем решить примеры!';
-
-        return queueSpeech(text, {
-            rate: 0.9,
-            onStart: () => $('#speakButton').addClass('speaking'),
-            onEnd: () => $('#speakButton').removeClass('speaking')
-        });
+    function toggleAutoVoice() {
+        const newState = !getAutoVoiceState();
+        setAutoVoiceState(newState);
+        return newState;
     }
 
     function onQueueComplete(callback) {
@@ -511,21 +671,41 @@ const YandexVoiceService = (function() {
     init();
 
     return {
+        // Основные методы
         queueSpeech,
-        speakQuestion,
-        speakCorrectAnswer,
-        speakWrongAnswer,
-        speakNumberComposition,
+        speakText,
         stopSpeaking,
         isSupported,
         onQueueComplete,
         resetCounters,
         clearCache,
-        isVoiceEnabled,
         getBrowserInfo: () => ({ ...browserInfo }),
-        isBuiltInAliceAvailable
+        isBuiltInAliceAvailable,
+
+        // Универсальные методы для ответов
+        speakCorrect,
+        speakWrong,
+
+        // Методы для математической игры
+        speakMathQuestion,
+        speakMathCorrectAnswer,
+        speakMathNumberComposition,
+
+        // Методы для слоговой игры
+        speakSyllableQuestion,
+        speakSyllableCorrectAnswer,
+        speakSyllableWrongAnswer,
+        speakSyllableLearning,
+
+        // Управление
+        toggleVoice,
+        toggleAutoVoice,
+        isVoiceEnabled,
+        getVoiceState,
+        getAutoVoiceState
     };
 })();
 
-// Заменяем старый VoiceService на новый
-const VoiceService = YandexVoiceService;
+// Заменяем старые сервисы на универсальный
+const VoiceService = UnifiedVoiceService;
+const YandexVoiceService = UnifiedVoiceService; // Для обратной совместимости
