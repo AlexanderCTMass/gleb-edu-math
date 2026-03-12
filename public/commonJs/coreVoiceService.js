@@ -609,7 +609,20 @@ const VoiceCore = (function() {
         },
         _getQueueLength: () => speechQueue.length,
         _getCurrentGame: () => currentGameId,
-        _getCacheSize: () => audioCache.size
+        _getCacheSize: () => audioCache.size,
+        _initAudioContext: function() {
+            if (!audioContext && browserInfo.hasWebAudio) {
+                try {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    if (audioContext.state === 'suspended') {
+                        audioContext.resume().catch(console.warn);
+                    }
+                    console.log('AudioContext initialized by user gesture');
+                } catch (e) {
+                    console.error('Failed to initialize AudioContext:', e);
+                }
+            }
+        },
     };
 })();
 

@@ -130,14 +130,41 @@
 
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
+
+<!-- ВАЖНО: Порядок загрузки скриптов -->
 <script src="js/data.js"></script>
+
+<!-- Сначала загружаем базовые сервисы -->
+<script src="../commonJs/coreVoiceService.js"></script>
+<script src="../commonJs/baseVoiceService.js"></script>
 <script src="../commonJs/resourceManager.js"></script>
+
+<!-- Затем игровые модули -->
 <script src="js/gameState.js"></script>
 <script src="js/house.js"></script>
-<script src="../commonJs/coreVoiceService.js"></script>
 <script src="js/voiceService.js"></script>
 <script src="js/gameLogic.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
+
+<!-- Добавляем скрипт для инициализации AudioContext по клику -->
+<script>
+  // Инициализация AudioContext при первом взаимодействии пользователя
+  (function() {
+    function initAudioOnUserInteraction() {
+      if (typeof VoiceCore !== 'undefined' && VoiceCore._initAudioContext) {
+        VoiceCore._initAudioContext();
+      }
+      // Удаляем обработчики после первого взаимодействия
+      document.removeEventListener('click', initAudioOnUserInteraction);
+      document.removeEventListener('touchstart', initAudioOnUserInteraction);
+      document.removeEventListener('keydown', initAudioOnUserInteraction);
+    }
+
+    document.addEventListener('click', initAudioOnUserInteraction);
+    document.addEventListener('touchstart', initAudioOnUserInteraction);
+    document.addEventListener('keydown', initAudioOnUserInteraction);
+  })();
+</script>
 </body>
 </html>
