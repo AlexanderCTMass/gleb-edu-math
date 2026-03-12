@@ -30,6 +30,18 @@ $(document).ready(function() {
         SyllableGameLogic.init();
         CharacterManager.startRandomTimer();
 
+        VoiceService.registerGame('syllableGame', {
+            getVoiceEnabled: () => SyllableGameState.getProp('voiceEnabled'),
+            setVoiceEnabled: (enabled) => SyllableGameState.update('voiceEnabled', enabled),
+            getAutoVoiceEnabled: () => SyllableGameState.getProp('autoVoice'),
+            setAutoVoiceEnabled: (enabled) => SyllableGameState.update('autoVoice', enabled),
+            onStartSpeaking: () => $('#syllableSpeakButton').addClass('speaking'),
+            onStopSpeaking: () => $('#syllableSpeakButton').removeClass('speaking')
+        });
+
+        // Переключаемся на слоговую игру
+        VoiceService.setCurrentGame('syllableGame');
+
         // Проверка поддержки озвучки
         if (!VoiceService.isSupported()) {
             $('#speakSyllableBtn, #repeatQuestionBtn, #voiceToggleBtn, #autoVoiceToggleBtn').hide();

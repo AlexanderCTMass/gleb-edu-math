@@ -28,6 +28,17 @@ $(document).ready(function() {
         $('#gameWrapper').css('opacity', '1');
         CharacterManager.startRandomTimer();
 
+        VoiceService.registerGame('mathGame', {
+            getVoiceEnabled: () => GameState.getProp('voiceEnabled'),
+            setVoiceEnabled: (enabled) => GameState.update('voiceEnabled', enabled),
+            getAutoVoiceEnabled: () => GameState.getProp('autoVoice'),
+            setAutoVoiceEnabled: (enabled) => GameState.update('autoVoice', enabled),
+            onStartSpeaking: () => $('#speakButton').addClass('speaking'),
+            onStopSpeaking: () => $('#speakButton').removeClass('speaking')
+        });
+
+// Переключаемся на математическую игру
+        VoiceService.setCurrentGame('mathGame');
         // Проверяем поддержку озвучки
         if (!VoiceService.isSupported()) {
             console.log('No speech support');

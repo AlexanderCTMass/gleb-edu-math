@@ -22,6 +22,12 @@ const UnifiedVoiceService = (function() {
     let correctCounter = 0;
     let wrongCounter = 0;
 
+    // Хранилище для разных игр (ключ - имя игры)
+    const gameStates = {};
+
+    // Текущая активная игра
+    let currentGame = 'default';
+
     // Определяем тип браузера и доступные API
     const browserInfo = {
         isYandexBrowser: /YaBrowser/i.test(navigator.userAgent),
@@ -32,51 +38,39 @@ const UnifiedVoiceService = (function() {
 
     console.log('UnifiedVoiceService browser info:', browserInfo);
 
-    // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+    // ========== РЕГИСТРАЦИЯ ИГР ==========
 
-    // Получение состояния голоса из активной игры
-    function getVoiceState() {
-        // Проверяем, какая игра активна (можно определить по наличию глобальных объектов)
-        if (typeof SyllableGameState !== 'undefined' && SyllableGameState.get) {
-            return SyllableGameState.getProp('voiceEnabled');
-        }
-        if (typeof GameState !== 'undefined' && GameState.get) {
-            return GameState.getProp('voiceEnabled');
-        }
-        return true; // По умолчанию включено
+    function registerGame(gameName, config) {
+        gameStates[gameName] = {
+            getVoiceEnabled: config.getVoiceEnabled || (() => true),
+            setVoiceEnabled: config.setVoiceEnabled || (() => {}),
+            getAutoVoiceEnabled: config.getAutoVoiceEnabled || (() => true),
+            setAutoVoiceEnabled: config.setAutoVoiceEnabled || (() => {}),
+            onStartSpeaking: config.onStartSpeaking || null,
+            onStopSpeaking: config.onStopSpeaking || null
+        };
+        console.log(`Game "${gameName}" registered with voice service`);
     }
 
-    function getAutoVoiceState() {
-        if (typeof SyllableGameState !== 'undefined' && SyllableGameState.get) {
-            return SyllableGameState.getProp('autoVoice');
-        }
-        if (typeof GameState !== 'undefined' && GameState.get) {
-            return GameState.getProp('autoVoice');
-        }
-        return true;
-    }
-
-    // Обновление состояния голоса в активной игре
-    function setVoiceState(enabled) {
-        if (typeof SyllableGameState !== 'undefined' && SyllableGameState.get) {
-            SyllableGameState.update('voiceEnabled', enabled);
-        }
-        if (typeof GameState !== 'undefined' && GameState.get) {
-            GameState.update('voiceEnabled', enabled);
+    function setCurrentGame(gameName) {
+        if (gameStates[gameName]) {
+            currentGame = gameName;
+            console.log(`Current game set to: ${gameName}`);
+        } else {
+            console.warn(`Game "${gameName}" not registered, using default`);
+            currentGame = 'default';
         }
     }
 
-    function setAutoVoiceState(enabled) {
-        if (typeof SyllableGameState !== 'undefined' && SyllableGameState.get) {
-            SyllableGameState.update('autoVoice', enabled);
-        }
-        if (typeof GameState !== 'undefined' && GameState.get) {
-            GameState.update('autoVoice', enabled);
-        }
-    }
-
-    function isVoiceEnabled() {
-        return getVoiceState();
+    function getCurrentGameState() {
+        return gameStates[currentGame] || gameStates['default'] || {
+            getVoiceEnabled: () => true,
+            setVoiceEnabled: () => {},
+            getAutoVoiceEnabled: () => true,
+            setAutoVoiceEnabled: () => {},
+            onStartSpeaking: null,
+            onStopSpeaking: null
+        };
     }
 
     // ========== ИНИЦИАЛИЗАЦИЯ ==========
@@ -101,6 +95,10 @@ const UnifiedVoiceService = (function() {
                 console.error('Failed to initialize AudioContext:', e);
             }
         }
+    }
+
+    function isVoiceEnabled() {
+        return getCurrentGameState().getVoiceEnabled();
     }
 
     // ========== УПРАВЛЕНИЕ ОЧЕРЕДЬЮ ==========
@@ -138,15 +136,34 @@ const UnifiedVoiceService = (function() {
         setTimeout(() => {
             trySpeak(next.text, {
                 ...next.options,
+                onStart: () => {
+                    const gameState = getCurrentGameState();
+                    if (gameState.onStartSpeaking) {
+                        gameState.onStartSpeaking();
+                    }
+                    if (next.options.onStart) next.options.onStart();
+                },
                 onEnd: () => {
                     console.log('Speech ended normally');
                     isProcessingQueue = false;
+
+                    const gameState = getCurrentGameState();
+                    if (gameState.onStopSpeaking) {
+                        gameState.onStopSpeaking();
+                    }
+
                     if (next.options.onEnd) next.options.onEnd();
                     processQueue();
                 },
                 onError: (error) => {
                     console.warn('Speech error (handled):', error?.error || error);
                     isProcessingQueue = false;
+
+                    const gameState = getCurrentGameState();
+                    if (gameState.onStopSpeaking) {
+                        gameState.onStopSpeaking();
+                    }
+
                     if (next.options.onError) next.options.onError(error);
                     if (next.options.onEnd) next.options.onEnd();
                     processQueue();
@@ -427,183 +444,6 @@ const UnifiedVoiceService = (function() {
             !!window.speechSynthesis;
     }
 
-    // ========== ОСНОВНЫЕ МЕТОДЫ ДЛЯ МАТЕМАТИЧЕСКОЙ ИГРЫ ==========
-
-    function speakMathQuestion(number, left, right, unknownSide) {
-        if (!isVoiceEnabled()) return false;
-
-        questionCounter++;
-        let text = '';
-
-        if (unknownSide === 'left') {
-            const variants = [
-                `Смотри, тут число ${number}. Мы знаем, что одно слагаемое - ${right}. Какое второе?`,
-                `Если к числу ${right} добавить какое-то число, получится ${number}. Что это за число?`,
-                `${right} плюс сколько будет ${number}?`,
-                `Найди недостающее число: ${right} + ? = ${number}`,
-                `Какое число нужно прибавить к ${right}, чтобы получить ${number}?`
-            ];
-            text = variants[questionCounter % variants.length];
-        } else if (unknownSide === 'right') {
-            const variants = [
-                `Смотри, тут число ${number}. Мы знаем, что одно слагаемое - ${left}. Какое второе?`,
-                `Если к числу ${left} добавить какое-то число, получится ${number}. Что это за число?`,
-                `${left} плюс сколько будет ${number}?`,
-                `Найди недостающее число: ${left} + ? = ${number}`,
-                `Какое число нужно прибавить к ${left}, чтобы получить ${number}?`
-            ];
-            text = variants[questionCounter % variants.length];
-        } else if (unknownSide === 'result') {
-            const variants = [
-                `Сколько будет ${left} плюс ${right}?`,
-                `Посчитай: ${left} + ${right} = ?`,
-                `Если сложить ${left} и ${right}, сколько получится?`,
-                `${left} да ${right} - это сколько вместе?`,
-                `Найди сумму чисел ${left} и ${right}`
-            ];
-            text = variants[questionCounter % variants.length];
-        }
-
-        return queueSpeech(text, { rate: 0.9 });
-    }
-
-    function speakMathCorrectAnswer(number, left, right, unknownSide) {
-        if (!isVoiceEnabled()) return false;
-
-        correctCounter++;
-        let text = '';
-
-        const praises = ['Верно!', 'Правильно!', 'Молодец!', 'Отлично!', 'Здорово!', 'Супер!'];
-        const praise = praises[correctCounter % praises.length];
-
-        if (unknownSide === 'left') {
-            const variants = [
-                `${praise} ${number} - это ${right} и ${left}`,
-                `${praise} Чтобы получить ${number}, нужно к ${right} прибавить ${left}`,
-                `${praise} ${right} плюс ${left} как раз будет ${number}`
-            ];
-            text = variants[correctCounter % variants.length];
-        } else if (unknownSide === 'right') {
-            const variants = [
-                `${praise} ${number} - это ${left} и ${right}`,
-                `${praise} Чтобы получить ${number}, нужно к ${left} прибавить ${right}`,
-                `${praise} ${left} плюс ${right} как раз будет ${number}`
-            ];
-            text = variants[correctCounter % variants.length];
-        } else if (unknownSide === 'result') {
-            const variants = [
-                `${praise} ${left} плюс ${right} равно ${number}`,
-                `${praise} Сумма чисел ${left} и ${right} - это ${number}`,
-                `${praise} ${left} + ${right} = ${number}`
-            ];
-            text = variants[correctCounter % variants.length];
-        }
-
-        return queueSpeech(text);
-    }
-
-    function speakMathNumberComposition(number, floors) {
-        if (!isVoiceEnabled()) return false;
-
-        let text = `Число ${number} можно получить разными способами. `;
-
-        const variants = floors.map(floor => `${floor.left} и ${floor.right}`).join(', ');
-        text += variants + '. ';
-
-        text += 'Давай попробуем решить примеры!';
-
-        return queueSpeech(text, {
-            rate: 0.9,
-            onStart: () => {
-                const $speakButton = $('#speakButton');
-                if ($speakButton.length) $speakButton.addClass('speaking');
-            },
-            onEnd: () => {
-                const $speakButton = $('#speakButton');
-                if ($speakButton.length) $speakButton.removeClass('speaking');
-            }
-        });
-    }
-
-    // ========== МЕТОДЫ ДЛЯ СЛОГОВОЙ ИГРЫ ==========
-
-    function speakSyllableQuestion(syllable, word, position) {
-        if (!isVoiceEnabled()) return false;
-
-        questionCounter++;
-        let text = '';
-
-        const variants = [
-            `Какой слог пропущен в слове ${word}?`,
-            `Найди пропущенный слог в слове ${word}`,
-            `Какой слог нужно добавить, чтобы получилось слово ${word}?`,
-            `В слове ${word} пропущен слог. Какой?`
-        ];
-        text = variants[questionCounter % variants.length];
-
-        return queueSpeech(text, { rate: 0.9 });
-    }
-
-    function speakSyllableCorrectAnswer(syllable, word) {
-        if (!isVoiceEnabled()) return false;
-
-        correctCounter++;
-
-        const praises = ['Верно!', 'Правильно!', 'Молодец!', 'Отлично!', 'Здорово!'];
-        const praise = praises[correctCounter % praises.length];
-
-        const variants = [
-            `${praise} Слог "${syllable}" - правильный ответ!`,
-            `${praise} Ты правильно выбрал слог "${syllable}" в слове ${word}`,
-            `${praise} "${syllable}" - верно!`
-        ];
-
-        const text = variants[correctCounter % variants.length];
-        return queueSpeech(text);
-    }
-
-    function speakSyllableWrongAnswer(correctSyllable) {
-        if (!isVoiceEnabled()) return false;
-
-        wrongCounter++;
-
-        const variants = [
-            'Попробуй другой слог',
-            'Не угадал, попробуй ещё раз',
-            'Почти, давай подумаем вместе',
-            'Этот слог не подходит, попробуй другой',
-            `Нет, это не "${correctSyllable}"?`
-        ];
-
-        const text = variants[wrongCounter % variants.length];
-        return queueSpeech(text);
-    }
-
-    function speakSyllableLearning(syllable, word) {
-        if (!isVoiceEnabled()) return false;
-
-        const variants = [
-            `Слог "${syllable}" встречается в слове ${word}`,
-            `Послушай: "${syllable}" - ${word}`,
-            `${word} - этот слог "${syllable}"`,
-            `Запомни: слог "${syllable}" есть в слове ${word}`
-        ];
-
-        const text = variants[questionCounter % variants.length];
-
-        return queueSpeech(text, {
-            rate: 0.8,
-            onStart: () => {
-                const $speakButton = $('#syllableSpeakButton');
-                if ($speakButton.length) $speakButton.addClass('speaking');
-            },
-            onEnd: () => {
-                const $speakButton = $('#syllableSpeakButton');
-                if ($speakButton.length) $speakButton.removeClass('speaking');
-            }
-        });
-    }
-
     // ========== УНИВЕРСАЛЬНЫЕ МЕТОДЫ ==========
 
     function speakText(text, options = {}) {
@@ -642,14 +482,18 @@ const UnifiedVoiceService = (function() {
     // ========== УПРАВЛЕНИЕ ==========
 
     function toggleVoice() {
-        const newState = !getVoiceState();
-        setVoiceState(newState);
+        const gameState = getCurrentGameState();
+        const currentState = gameState.getVoiceEnabled();
+        const newState = !currentState;
+        gameState.setVoiceEnabled(newState);
         return newState;
     }
 
     function toggleAutoVoice() {
-        const newState = !getAutoVoiceState();
-        setAutoVoiceState(newState);
+        const gameState = getCurrentGameState();
+        const currentState = gameState.getAutoVoiceEnabled();
+        const newState = !currentState;
+        gameState.setAutoVoiceEnabled(newState);
         return newState;
     }
 
@@ -667,10 +511,22 @@ const UnifiedVoiceService = (function() {
         audioCache.clear();
     }
 
+    // Регистрируем игру по умолчанию
+    registerGame('default', {
+        getVoiceEnabled: () => true,
+        setVoiceEnabled: () => {},
+        getAutoVoiceEnabled: () => true,
+        setAutoVoiceEnabled: () => {}
+    });
+
     // Инициализация
     init();
 
     return {
+        // Регистрация игр
+        registerGame,
+        setCurrentGame,
+
         // Основные методы
         queueSpeech,
         speakText,
@@ -686,23 +542,10 @@ const UnifiedVoiceService = (function() {
         speakCorrect,
         speakWrong,
 
-        // Методы для математической игры
-        speakMathQuestion,
-        speakMathCorrectAnswer,
-        speakMathNumberComposition,
-
-        // Методы для слоговой игры
-        speakSyllableQuestion,
-        speakSyllableCorrectAnswer,
-        speakSyllableWrongAnswer,
-        speakSyllableLearning,
-
         // Управление
         toggleVoice,
         toggleAutoVoice,
-        isVoiceEnabled,
-        getVoiceState,
-        getAutoVoiceState
+        isVoiceEnabled
     };
 })();
 
