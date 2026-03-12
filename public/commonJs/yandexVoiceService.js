@@ -511,6 +511,7 @@ const YandexVoiceService = (function() {
     init();
 
     return {
+        queueSpeech,
         speakQuestion,
         speakCorrectAnswer,
         speakWrongAnswer,
