@@ -20,8 +20,11 @@ const VoiceCore = (function() {
     let isProcessingQueue = false;
     let onQueueCompleteCallback = null;
 
-    // Кэш для уже загруженных аудио (с частотой использования)
-    const audioCache = new Map(); // key -> {data, hits, lastUsed}
+    // Кэш для уже загруженных аудио
+    const audioCache = new Map();
+
+    // Флаг для предотвращения рекурсии
+    let isSettingState = false;
 
     // Определяем тип браузера и доступные API
     const browserInfo = {
@@ -36,14 +39,34 @@ const VoiceCore = (function() {
     // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 
     function getVoiceState() {
-        const saved = localStorage.getItem('voiceEnabled');
-        return saved !== null ? saved === 'true' : true;
+        try {
+            const saved = localStorage.getItem('voiceEnabled');
+            return saved !== null ? saved === 'true' : true;
+        } catch (e) {
+            console.warn('Failed to read voice state from localStorage:', e);
+            return true;
+        }
     }
 
     function setVoiceState(enabled) {
-        localStorage.setItem('voiceEnabled', enabled);
-        // Dispatch события для синхронизации с GameState
-        window.dispatchEvent(new CustomEvent('voiceStateChanged', { detail: { enabled } }));
+        // Предотвращаем рекурсию
+        if (isSettingState) return;
+
+        isSettingState = true;
+
+        try {
+            localStorage.setItem('voiceEnabled', enabled);
+            console.log('Voice state saved to localStorage:', enabled);
+
+            // Отправляем событие только если это не было вызвано событием
+            window.dispatchEvent(new CustomEvent('voiceStateChanged', {
+                detail: { enabled, source: 'core' }
+            }));
+        } catch (e) {
+            console.warn('Failed to save voice state to localStorage:', e);
+        } finally {
+            isSettingState = false;
+        }
     }
 
     function isVoiceEnabled() {
@@ -58,12 +81,24 @@ const VoiceCore = (function() {
         }
 
         // Слушаем события от GameState
-        window.addEventListener('voiceStateChanged', (e) => {
+        window.addEventListener('voiceStateChanged', function(e) {
+            // Предотвращаем обработку своих же событий
+            if (e.detail && e.detail.source === 'core') return;
+
             if (e.detail && typeof e.detail.enabled !== 'undefined') {
-                setVoiceState(e.detail.enabled);
+                const newState = e.detail.enabled;
+                console.log('Voice state changed event received:', newState);
+
+                // Обновляем localStorage без отправки нового события
+                try {
+                    localStorage.setItem('voiceEnabled', newState);
+                } catch (err) {
+                    console.warn('Failed to save voice state:', err);
+                }
             }
         });
 
+        // Инициализация AudioContext при первом взаимодействии
         document.addEventListener('click', initAudioContext, { once: true });
         document.addEventListener('touchstart', initAudioContext, { once: true });
     }
@@ -75,6 +110,7 @@ const VoiceCore = (function() {
                 if (audioContext.state === 'suspended') {
                     audioContext.resume().catch(console.warn);
                 }
+                console.log('AudioContext initialized');
             } catch (e) {
                 console.error('Failed to initialize AudioContext:', e);
             }
@@ -141,7 +177,6 @@ const VoiceCore = (function() {
     }
 
     function stopCurrentSpeech() {
-        // Остановка Web Speech
         if (window.speechSynthesis) {
             try {
                 window.speechSynthesis.cancel();
@@ -150,7 +185,6 @@ const VoiceCore = (function() {
             }
         }
 
-        // Остановка аудио
         if (currentAudio) {
             try {
                 if (currentAudio.stop && typeof currentAudio.stop === 'function') {
@@ -165,7 +199,6 @@ const VoiceCore = (function() {
             currentAudio = null;
         }
 
-        // Остановка Яндекс.Алисы
         if (browserInfo.hasYandexSpeaker) {
             try {
                 const speaker = window.external.GetSpeaker();
@@ -177,7 +210,6 @@ const VoiceCore = (function() {
             }
         }
 
-        // Закрытие AudioContext
         if (audioContext && audioContext.state !== 'closed') {
             try {
                 audioContext.close().catch(console.warn);
@@ -216,7 +248,6 @@ const VoiceCore = (function() {
     // ========== API ДЛЯ ЯНДЕКС.БРАУЗЕРА ==========
 
     function trySpeak(text, options) {
-        // Проверяем поддержку браузера
         if (!isAnySpeechSupported()) {
             console.warn('No speech synthesis supported');
             if (options.onError) options.onError(new Error('No speech supported'));
@@ -230,11 +261,13 @@ const VoiceCore = (function() {
             }
         }
 
-        // Пробуем облачное API только если есть поддержка AudioContext
         if (browserInfo.hasWebAudio) {
             speakWithCloudAPI(text, options);
-        } else {
+        } else if (browserInfo.hasSpeechSynthesis) {
             speakWithWebSpeech(text, options);
+        } else {
+            if (options.onError) options.onError(new Error('No speech method available'));
+            if (options.onEnd) options.onEnd();
         }
     }
 
@@ -252,7 +285,6 @@ const VoiceCore = (function() {
         try {
             const speaker = window.external.GetSpeaker();
 
-            // Проверяем наличие необходимых методов
             if (!speaker || typeof speaker.Speak !== 'function') {
                 return false;
             }
@@ -261,7 +293,6 @@ const VoiceCore = (function() {
 
             currentGameId = options.gameId || null;
 
-            // Устанавливаем параметры, если они поддерживаются
             if (typeof speaker.Rate !== 'undefined') {
                 speaker.Rate = options.rate || 1.0;
             }
@@ -296,7 +327,8 @@ const VoiceCore = (function() {
         try {
             return browserInfo.isYandexBrowser &&
                 browserInfo.hasYandexSpeaker &&
-                window.external.GetSpeaker() !== null;
+                window.external &&
+                typeof window.external.GetSpeaker === 'function';
         } catch (e) {
             return false;
         }
@@ -310,7 +342,6 @@ const VoiceCore = (function() {
         if (options.onStart) safeCallback(options.onStart);
         currentGameId = options.gameId || null;
 
-        // Проверяем кэш
         if (audioCache.has(text)) {
             console.log('Using cached audio for:', text.substring(0, 30));
             const cached = audioCache.get(text);
@@ -322,7 +353,6 @@ const VoiceCore = (function() {
 
         console.log('Requesting TTS from server:', text.substring(0, 30));
 
-        // Таймаут для fetch
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -350,7 +380,6 @@ const VoiceCore = (function() {
             })
             .then(data => {
                 if (data.audio) {
-                    // Кэшируем с информацией о частоте использования
                     if (audioCache.size >= CACHE_MAX_SIZE) {
                         evictLeastUsed();
                     }
@@ -367,7 +396,6 @@ const VoiceCore = (function() {
             .catch(error => {
                 clearTimeout(timeoutId);
                 console.error('Cloud TTS error:', error);
-                // Пробуем web speech как запасной вариант
                 if (browserInfo.hasSpeechSynthesis) {
                     speakWithWebSpeech(text, options);
                 } else {
@@ -383,7 +411,6 @@ const VoiceCore = (function() {
         let oldestTime = Infinity;
 
         for (const [key, value] of audioCache.entries()) {
-            // Комбинированная метрика: меньше хитов или старше
             if (value.hits < leastUsedHits ||
                 (value.hits === leastUsedHits && value.lastUsed < oldestTime)) {
                 leastUsedHits = value.hits;
@@ -597,8 +624,16 @@ const VoiceCore = (function() {
 
         // Для синхронизации с GameState
         syncWithGameState: (enabled) => {
-            setVoiceState(enabled);
+            // Просто обновляем localStorage без отправки события
+            try {
+                localStorage.setItem('voiceEnabled', enabled);
+            } catch (e) {
+                console.warn('Failed to sync voice state:', e);
+            }
         },
+
+        // Ручная инициализация AudioContext
+        _initAudioContext: initAudioContext,
 
         // Внутренние методы (для отладки)
         _resetQueue: () => {
@@ -609,20 +644,7 @@ const VoiceCore = (function() {
         },
         _getQueueLength: () => speechQueue.length,
         _getCurrentGame: () => currentGameId,
-        _getCacheSize: () => audioCache.size,
-        _initAudioContext: function() {
-            if (!audioContext && browserInfo.hasWebAudio) {
-                try {
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    if (audioContext.state === 'suspended') {
-                        audioContext.resume().catch(console.warn);
-                    }
-                    console.log('AudioContext initialized by user gesture');
-                } catch (e) {
-                    console.error('Failed to initialize AudioContext:', e);
-                }
-            }
-        },
+        _getCacheSize: () => audioCache.size
     };
 })();
 
