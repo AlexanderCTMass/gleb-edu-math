@@ -63,7 +63,7 @@
     <!-- Режим обучения -->
     <div id="learningMode" class="learning-mode">
       <div class="syllable-card">
-        <div class="syllable-display" id="current-syllable">ма</div>
+        <div class="syllable-display" id="current-syllable">...</div>
         <button id="speakSyllableBtn" class="speak-button">
           <span class="speak-icon">🔊</span>
         </button>
@@ -71,7 +71,7 @@
 
       <div class="word-example">
         <div class="word-label">В слове:</div>
-        <div class="word-highlight" id="word-highlight">мама</div>
+        <div class="word-highlight" id="word-highlight">...</div>
       </div>
 
       <div class="progress-info">
@@ -91,16 +91,16 @@
       </div>
 
       <div class="question-word" id="word-with-blank">
-        <span class="word-part">ма</span>
+        <span class="word-part">...</span>
         <span class="word-part blank">___</span>
-        <span class="word-part">а</span>
+        <span class="word-part">...</span>
       </div>
 
       <div class="options-grid" id="optionsContainer">
-        <button id="option1" class="option-btn">ма</button>
-        <button id="option2" class="option-btn">па</button>
-        <button id="option3" class="option-btn">на</button>
-        <button id="option4" class="option-btn">ка</button>
+        <button id="option1" class="option-btn">...</button>
+        <button id="option2" class="option-btn">...</button>
+        <button id="option3" class="option-btn">...</button>
+        <button id="option4" class="option-btn">...</button>
       </div>
 
       <button id="repeatQuestionBtn" class="repeat-question-btn">
@@ -137,20 +137,29 @@
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
 
-<!-- Сначала данные -->
-<script src="js/syllableData.js"></script>
-
-<!-- Общие сервисы (ВАЖНО: baseVoiceService должен быть перед voiceService) -->
+<!-- Общие сервисы -->
 <script src="../commonJs/coreVoiceService.js"></script>
 <script src="../commonJs/baseVoiceService.js"></script>
 <script src="../commonJs/resourceManager.js"></script>
 
-<!-- Затем игровые модули -->
+<!-- Данные игры - ВАЖНО: сначала уровни, потом персонажи -->
+<script src="js/syllableLevels.js"></script>
+<script src="js/syllableData.js"></script>
+
+<!-- Состояние игры -->
 <script src="js/syllableGameState.js"></script>
+
+<!-- Голосовой сервис (зависит от состояния) -->
 <script src="js/syllableVoiceService.js"></script>
+
+<!-- UI и персонажи -->
 <script src="js/syllableUi.js"></script>
 <script src="js/syllableCharacterManager.js"></script>
+
+<!-- Логика игры (зависит от всего остального) -->
 <script src="js/syllableGameLogic.js"></script>
+
+<!-- Главный файл (последним) -->
 <script src="js/syllableMain.js"></script>
 
 <!-- Скрипт для инициализации AudioContext -->

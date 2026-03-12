@@ -11,10 +11,30 @@ const SyllableGameLogic = (function() {
 
     function init() {
         console.log('SyllableGameLogic initialized');
-        loadLevel();
+        // Ждем немного, чтобы убедиться, что все данные загружены
+        setTimeout(() => {
+            loadLevel();
+        }, 100);
+    }
+
+    function checkLevelsLoaded() {
+        if (typeof SyllableLevels === 'undefined') {
+            console.error('SyllableLevels is not defined!');
+            return false;
+        }
+        if (!SyllableLevels || SyllableLevels.length === 0) {
+            console.error('SyllableLevels is empty!');
+            return false;
+        }
+        return true;
     }
 
     function loadLevel() {
+        if (!checkLevelsLoaded()) {
+            console.error('Cannot load level: SyllableLevels not available');
+            return;
+        }
+
         const state = SyllableGameState.get();
         const level = SyllableLevels.find(l => l.id === state.currentLevel);
 
@@ -23,7 +43,7 @@ const SyllableGameLogic = (function() {
             return;
         }
 
-        $('#level-name').text(level.name);
+        $('#level-name').text(level.name || 'Уровень ' + state.currentLevel);
         $('#current-level').text(state.currentLevel);
 
         updateStats();
@@ -49,17 +69,20 @@ const SyllableGameLogic = (function() {
 
         if (!level) return;
 
-        const syllable = level.syllables[state.currentSyllableIndex];
-        const word = level.words[state.currentSyllableIndex];
+        const syllable = level.syllables[state.currentSyllableIndex] || '?';
+        const word = level.words && level.words[state.currentSyllableIndex] ?
+            level.words[state.currentSyllableIndex] : '';
 
         $('#current-syllable').text(syllable);
-        $('#word-highlight').text(word || '');
+        $('#word-highlight').text(word || syllable);
         $('#syllable-count').text(`${state.currentSyllableIndex + 1}/${level.syllables.length}`);
 
-        highlightSyllableInWord(syllable, word || '');
+        if (word) {
+            highlightSyllableInWord(syllable, word);
+        }
 
         if (SyllableGameState.getProp('autoVoice') && typeof SyllableVoiceService !== 'undefined') {
-            setTimeout(() => speakSyllable(syllable, word || ''), 300);
+            setTimeout(() => speakSyllable(syllable, word || syllable), 300);
         }
     }
 
@@ -101,14 +124,20 @@ const SyllableGameLogic = (function() {
     }
 
     function generateQuestion() {
+        if (!checkLevelsLoaded()) return;
+
         const state = SyllableGameState.get();
         const level = SyllableLevels.find(l => l.id === state.currentLevel);
 
-        if (!level || !level.syllables || level.syllables.length === 0) return;
+        if (!level || !level.syllables || level.syllables.length === 0) {
+            console.error('No syllables found for level', state.currentLevel);
+            return;
+        }
 
         const randomIndex = Math.floor(Math.random() * level.syllables.length);
         currentQuestionSyllable = level.syllables[randomIndex];
-        currentQuestionWord = level.words ? level.words[randomIndex] : '';
+        currentQuestionWord = level.words && level.words[randomIndex] ?
+            level.words[randomIndex] : currentQuestionSyllable;
 
         const otherSyllables = level.syllables.filter(s => s !== currentQuestionSyllable);
         const shuffledOthers = shuffleArray([...otherSyllables]);
@@ -117,7 +146,10 @@ const SyllableGameLogic = (function() {
         currentOptions = [currentQuestionSyllable, ...otherOptions];
 
         while (currentOptions.length < 4) {
-            currentOptions.push(getRandomSyllableFromAnyLevel());
+            const randomSyllable = getRandomSyllableFromAnyLevel();
+            if (randomSyllable && !currentOptions.includes(randomSyllable)) {
+                currentOptions.push(randomSyllable);
+            }
         }
 
         currentOptions = shuffleArray(currentOptions).slice(0, 4);
@@ -153,6 +185,8 @@ const SyllableGameLogic = (function() {
     }
 
     function getRandomSyllableFromAnyLevel() {
+        if (!checkLevelsLoaded()) return 'МА';
+
         const allSyllables = [];
         SyllableLevels.forEach(level => {
             if (level.syllables) {
@@ -335,6 +369,7 @@ const SyllableGameLogic = (function() {
     // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 
     function shuffleArray(array) {
+        if (!array || !array.length) return [];
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [array[i], array[j]] = [array[j], array[i]];
@@ -366,28 +401,6 @@ const SyllableGameLogic = (function() {
                 $('#wrong-counter').css('color', '#666');
             }
         }
-
-        updateVoiceUI();
-    }
-
-    function updateVoiceUI() {
-        const state = SyllableGameState.get();
-
-        if (state.voiceEnabled) {
-            $('#voiceToggleBtn').removeClass('disabled');
-            $('#voiceIcon').text('🔊');
-        } else {
-            $('#voiceToggleBtn').addClass('disabled');
-            $('#voiceIcon').text('🔇');
-        }
-
-        if (state.autoVoice) {
-            $('#autoVoiceToggleBtn').addClass('active');
-            $('#autoVoiceIcon').text('🎤');
-        } else {
-            $('#autoVoiceToggleBtn').removeClass('active');
-            $('#autoVoiceIcon').text('🎤');
-        }
     }
 
     // ========== ПУБЛИЧНЫЙ API ==========
@@ -405,12 +418,15 @@ const SyllableGameLogic = (function() {
         },
 
         speakCurrentSyllable: function() {
+            if (!checkLevelsLoaded()) return;
+
             if (SyllableGameState.getProp('currentMode') === 'learning') {
                 const state = SyllableGameState.get();
                 const level = SyllableLevels.find(l => l.id === state.currentLevel);
                 if (level) {
                     const syllable = level.syllables[state.currentSyllableIndex];
-                    const word = level.words ? level.words[state.currentSyllableIndex] : '';
+                    const word = level.words && level.words[state.currentSyllableIndex] ?
+                        level.words[state.currentSyllableIndex] : syllable;
                     speakSyllable(syllable, word);
                 }
             }
@@ -419,7 +435,7 @@ const SyllableGameLogic = (function() {
         _getCurrentQuestion: () => ({
             syllable: currentQuestionSyllable,
             word: currentQuestionWord,
-            options: [...currentOptions]
+            options: [...(currentOptions || [])]
         }),
 
         _reset: () => {
@@ -436,4 +452,5 @@ const SyllableGameLogic = (function() {
     };
 })();
 
+// Глобальная переменная
 window.SyllableGameLogic = SyllableGameLogic;

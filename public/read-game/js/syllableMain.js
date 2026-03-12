@@ -13,6 +13,10 @@ $(document).ready(function() {
     const characters = (window.SyllableGame && SyllableGame.Characters) || window.Characters || [];
     const phrases = (window.SyllableGame && SyllableGame.Phrases) || window.Phrases || [];
 
+    console.log('Characters loaded:', characters.length);
+    console.log('Phrases loaded:', phrases.length);
+    console.log('SyllableLevels loaded:', typeof SyllableLevels !== 'undefined' ? SyllableLevels.length : 'undefined');
+
     // Загрузка ресурсов
     if (typeof ResourceManager === 'undefined') {
         console.error('ResourceManager not found!');
@@ -29,6 +33,7 @@ $(document).ready(function() {
             $('#loadingStatus').text(percent + '%');
         },
         () => {
+            console.log('Resources loaded, starting game...');
             $('#loadingScreen').addClass('hidden');
             startGame();
         }
@@ -42,6 +47,13 @@ $(document).ready(function() {
         // Инициализация
         if (typeof UIManager !== 'undefined') {
             UIManager.init(SyllableGameState);
+        }
+
+        // Проверяем наличие SyllableLevels перед инициализацией логики
+        if (typeof SyllableLevels === 'undefined') {
+            console.error('SyllableLevels is not defined!');
+            $('#level-name').text('Ошибка загрузки');
+            return;
         }
 
         if (typeof SyllableGameLogic !== 'undefined') {
