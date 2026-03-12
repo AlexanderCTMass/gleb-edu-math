@@ -1,5 +1,5 @@
-// ========== УНИВЕРСАЛЬНЫЙ СЕРВИС ОЗВУЧКИ ==========
-const UnifiedVoiceService = (function() {
+// ========== БАЗОВЫЙ СЕРВИС ОЗВУЧКИ (ЯДРО) ==========
+const VoiceCoreService = (function() {
     // Конфигурация
     const API_URL = '/api/tts';
 
@@ -17,17 +17,6 @@ const UnifiedVoiceService = (function() {
     // Кэш для уже загруженных аудио
     const audioCache = new Map();
 
-    // Счетчики для разнообразия
-    let questionCounter = 0;
-    let correctCounter = 0;
-    let wrongCounter = 0;
-
-    // Хранилище для разных игр (ключ - имя игры)
-    const gameStates = {};
-
-    // Текущая активная игра
-    let currentGame = 'default';
-
     // Определяем тип браузера и доступные API
     const browserInfo = {
         isYandexBrowser: /YaBrowser/i.test(navigator.userAgent),
@@ -36,41 +25,23 @@ const UnifiedVoiceService = (function() {
         hasWebAudio: !!(window.AudioContext || window.webkitAudioContext)
     };
 
-    console.log('UnifiedVoiceService browser info:', browserInfo);
+    console.log('VoiceCoreService browser info:', browserInfo);
 
-    // ========== РЕГИСТРАЦИЯ ИГР ==========
+    // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 
-    function registerGame(gameName, config) {
-        gameStates[gameName] = {
-            getVoiceEnabled: config.getVoiceEnabled || (() => true),
-            setVoiceEnabled: config.setVoiceEnabled || (() => {}),
-            getAutoVoiceEnabled: config.getAutoVoiceEnabled || (() => true),
-            setAutoVoiceEnabled: config.setAutoVoiceEnabled || (() => {}),
-            onStartSpeaking: config.onStartSpeaking || null,
-            onStopSpeaking: config.onStopSpeaking || null
-        };
-        console.log(`Game "${gameName}" registered with voice service`);
+    // Получение состояния голоса
+    function getVoiceState() {
+        // Проверяем localStorage или глобальные настройки
+        const saved = localStorage.getItem('voiceEnabled');
+        return saved !== null ? saved === 'true' : true;
     }
 
-    function setCurrentGame(gameName) {
-        if (gameStates[gameName]) {
-            currentGame = gameName;
-            console.log(`Current game set to: ${gameName}`);
-        } else {
-            console.warn(`Game "${gameName}" not registered, using default`);
-            currentGame = 'default';
-        }
+    function setVoiceState(enabled) {
+        localStorage.setItem('voiceEnabled', enabled);
     }
 
-    function getCurrentGameState() {
-        return gameStates[currentGame] || gameStates['default'] || {
-            getVoiceEnabled: () => true,
-            setVoiceEnabled: () => {},
-            getAutoVoiceEnabled: () => true,
-            setAutoVoiceEnabled: () => {},
-            onStartSpeaking: null,
-            onStopSpeaking: null
-        };
+    function isVoiceEnabled() {
+        return getVoiceState();
     }
 
     // ========== ИНИЦИАЛИЗАЦИЯ ==========
@@ -97,14 +68,10 @@ const UnifiedVoiceService = (function() {
         }
     }
 
-    function isVoiceEnabled() {
-        return getCurrentGameState().getVoiceEnabled();
-    }
-
     // ========== УПРАВЛЕНИЕ ОЧЕРЕДЬЮ ==========
 
     function queueSpeech(text, options = {}) {
-        if (!isVoiceEnabled()) {
+        if (!isVoiceEnabled() && !options.force) {
             if (options.onEnd) setTimeout(options.onEnd, 10);
             return false;
         }
@@ -136,34 +103,15 @@ const UnifiedVoiceService = (function() {
         setTimeout(() => {
             trySpeak(next.text, {
                 ...next.options,
-                onStart: () => {
-                    const gameState = getCurrentGameState();
-                    if (gameState.onStartSpeaking) {
-                        gameState.onStartSpeaking();
-                    }
-                    if (next.options.onStart) next.options.onStart();
-                },
                 onEnd: () => {
                     console.log('Speech ended normally');
                     isProcessingQueue = false;
-
-                    const gameState = getCurrentGameState();
-                    if (gameState.onStopSpeaking) {
-                        gameState.onStopSpeaking();
-                    }
-
                     if (next.options.onEnd) next.options.onEnd();
                     processQueue();
                 },
                 onError: (error) => {
                     console.warn('Speech error (handled):', error?.error || error);
                     isProcessingQueue = false;
-
-                    const gameState = getCurrentGameState();
-                    if (gameState.onStopSpeaking) {
-                        gameState.onStopSpeaking();
-                    }
-
                     if (next.options.onError) next.options.onError(error);
                     if (next.options.onEnd) next.options.onEnd();
                     processQueue();
@@ -444,111 +392,51 @@ const UnifiedVoiceService = (function() {
             !!window.speechSynthesis;
     }
 
-    // ========== УНИВЕРСАЛЬНЫЕ МЕТОДЫ ==========
-
-    function speakText(text, options = {}) {
-        if (!isVoiceEnabled()) return false;
-        return queueSpeech(text, options);
-    }
-
-    function speakCorrect() {
-        if (!isVoiceEnabled()) return false;
-
-        correctCounter++;
-
-        const praises = ['Верно!', 'Правильно!', 'Молодец!', 'Отлично!', 'Здорово!', 'Супер!'];
-        const text = praises[correctCounter % praises.length];
-
-        return queueSpeech(text);
-    }
-
-    function speakWrong() {
-        if (!isVoiceEnabled()) return false;
-
-        wrongCounter++;
-
-        const texts = [
-            'Попробуй ещё раз!',
-            'Не получается? Давай подумаем вместе',
-            'Почти, попробуй другой вариант',
-            'Не угадал. Попробуй снова',
-            'Не верно. Давай попробуем другую цифру'
-        ];
-
-        const text = texts[wrongCounter % texts.length];
-        return queueSpeech(text);
-    }
-
-    // ========== УПРАВЛЕНИЕ ==========
-
-    function toggleVoice() {
-        const gameState = getCurrentGameState();
-        const currentState = gameState.getVoiceEnabled();
-        const newState = !currentState;
-        gameState.setVoiceEnabled(newState);
-        return newState;
-    }
-
-    function toggleAutoVoice() {
-        const gameState = getCurrentGameState();
-        const currentState = gameState.getAutoVoiceEnabled();
-        const newState = !currentState;
-        gameState.setAutoVoiceEnabled(newState);
-        return newState;
+    function playAudioData(audioData, options) {
+        playBase64Audio(audioData, options);
     }
 
     function onQueueComplete(callback) {
         onQueueCompleteCallback = callback;
     }
 
-    function resetCounters() {
-        questionCounter = 0;
-        correctCounter = 0;
-        wrongCounter = 0;
-    }
-
     function clearCache() {
         audioCache.clear();
     }
 
-    // Регистрируем игру по умолчанию
-    registerGame('default', {
-        getVoiceEnabled: () => true,
-        setVoiceEnabled: () => {},
-        getAutoVoiceEnabled: () => true,
-        setAutoVoiceEnabled: () => {}
-    });
+    function toggleVoice() {
+        const newState = !getVoiceState();
+        setVoiceState(newState);
+        return newState;
+    }
 
     // Инициализация
     init();
 
     return {
-        // Регистрация игр
-        registerGame,
-        setCurrentGame,
-
         // Основные методы
         queueSpeech,
-        speakText,
+        speakText: queueSpeech, // Алиас для обратной совместимости
         stopSpeaking,
         isSupported,
         onQueueComplete,
-        resetCounters,
         clearCache,
         getBrowserInfo: () => ({ ...browserInfo }),
         isBuiltInAliceAvailable,
 
-        // Универсальные методы для ответов
-        speakCorrect,
-        speakWrong,
-
         // Управление
         toggleVoice,
-        toggleAutoVoice,
-        isVoiceEnabled
+        isVoiceEnabled,
+        getVoiceState,
+        setVoiceState,
+
+        // Внутренние методы (для специализированных сервисов)
+        _resetQueue: () => {
+            speechQueue = [];
+            isProcessingQueue = false;
+        },
+        _getQueueLength: () => speechQueue.length
     };
 })();
 
-// Заменяем старые сервисы на универсальный
-const VoiceService = UnifiedVoiceService;
-const YandexVoiceService = UnifiedVoiceService; // Для обратной совместимости
+window.VoiceCoreService = VoiceCoreService;
