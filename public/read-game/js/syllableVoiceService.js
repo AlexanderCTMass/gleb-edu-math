@@ -114,7 +114,7 @@ const SyllableVoiceService = (function() {
 
             const variants = [
                 `Слог "${syllable}" встречается в слове ${word}`,
-                `Послушай: "${syllable}" - ${word}`,
+                `"${syllable}" sil<[500]> ${word}`,
                 `${word} - этот слог "${syllable}"`,
                 `Запомни: слог "${syllable}" есть в слове ${word}`
             ];

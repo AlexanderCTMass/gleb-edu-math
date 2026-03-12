@@ -1,11 +1,496 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Для глеба</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Игры для Глеба</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Анимированные фоновые элементы */
+        .bg-bubble {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .bg-bubble-1 {
+            width: 300px;
+            height: 300px;
+            top: -100px;
+            right: -100px;
+            background: rgba(255, 215, 0, 0.1);
+            animation: float 20s infinite ease-in-out;
+        }
+
+        .bg-bubble-2 {
+            width: 400px;
+            height: 400px;
+            bottom: -150px;
+            left: -150px;
+            background: rgba(255, 255, 255, 0.08);
+            animation: float 25s infinite ease-in-out reverse;
+        }
+
+        .bg-bubble-3 {
+            width: 200px;
+            height: 200px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 215, 0, 0.05);
+            animation: pulse 15s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(30px, -30px) rotate(120deg); }
+            66% { transform: translate(-20px, 20px) rotate(240deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.5; }
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            z-index: 10;
+            text-align: center;
+        }
+
+        /* Заголовок */
+        .header {
+            margin-bottom: 50px;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: clamp(2.5rem, 8vw, 4rem);
+            color: white;
+            text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.2), 5px 5px 0 rgba(255, 215, 0, 0.3);
+            margin-bottom: 10px;
+            animation: slideDown 0.8s ease-out;
+        }
+
+        .header .subtitle {
+            font-size: clamp(1rem, 4vw, 1.5rem);
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.1);
+            animation: slideUp 0.8s ease-out 0.2s both;
+        }
+
+        .header .stars {
+            margin-top: 15px;
+            font-size: 2rem;
+            animation: twinkle 2s infinite;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+
+        /* Сетка игр */
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            padding: 20px;
+            margin-bottom: 40px;
+        }
+
+        /* Карточка игры */
+        .game-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 40px;
+            padding: 30px 20px;
+            text-decoration: none;
+            color: white;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            position: relative;
+            overflow: hidden;
+            animation: cardAppear 0.6s ease-out both;
+        }
+
+        .game-card:nth-child(1) { animation-delay: 0.2s; }
+        .game-card:nth-child(2) { animation-delay: 0.4s; }
+
+        @keyframes cardAppear {
+            from {
+                opacity: 0;
+                transform: translateY(50px) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .game-card:hover {
+            transform: translateY(-10px);
+            border-color: #ffd700;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 0 4px rgba(255, 215, 0, 0.3);
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .game-card:active {
+            transform: translateY(-5px);
+        }
+
+        /* Иконка игры */
+        .game-icon {
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            border: 4px solid white;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .game-card:hover .game-icon {
+            transform: rotate(10deg) scale(1.1);
+            background: #ffd700;
+            color: #764ba2;
+        }
+
+        .game-icon::after {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .game-card:hover .game-icon::after {
+            border-color: white;
+            animation: spin 3s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Название игры */
+        .game-title {
+            font-size: 28px;
+            font-weight: bold;
+            text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        /* Описание игры */
+        .game-description {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.5;
+            min-height: 70px;
+        }
+
+        /* Прогресс-бар (для будущей реализации) */
+        .game-progress {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            border-radius: 20px;
+            transition: width 0.3s ease;
+        }
+
+        /* Бейдж с уровнем */
+        .level-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 215, 0, 0.9);
+            color: #764ba2;
+            padding: 5px 15px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: bold;
+            border: 2px solid white;
+        }
+
+        /* Нижняя часть */
+        .footer {
+            margin-top: 40px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            animation: fadeIn 1s ease-out 0.6s both;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .footer .characters {
+            font-size: 24px;
+            margin-bottom: 10px;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        /* Адаптация для мобильных */
+        @media (max-width: 600px) {
+            .games-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                padding: 10px;
+            }
+
+            .game-card {
+                padding: 20px;
+            }
+
+            .game-icon {
+                width: 100px;
+                height: 100px;
+                font-size: 50px;
+            }
+
+            .game-title {
+                font-size: 24px;
+            }
+
+            .game-description {
+                font-size: 14px;
+                min-height: 60px;
+            }
+
+            .bg-bubble-1 {
+                width: 200px;
+                height: 200px;
+            }
+
+            .bg-bubble-2 {
+                width: 300px;
+                height: 300px;
+            }
+        }
+
+        @media (max-width: 350px) {
+            .game-icon {
+                width: 80px;
+                height: 80px;
+                font-size: 40px;
+            }
+
+            .game-title {
+                font-size: 20px;
+            }
+        }
+
+        /* Для landscape ориентации */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .games-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .game-card {
+                padding: 15px;
+            }
+
+            .game-icon {
+                width: 70px;
+                height: 70px;
+                font-size: 35px;
+            }
+        }
+
+        /* Кнопка "Выбрать позже" (если нужно) */
+        .skip-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 25px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50px;
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .skip-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #ffd700;
+        }
+    </style>
 </head>
 <body>
-<a href="math-game">Изучение состава числа</a>
-<a href="read-game">Изучение слогов (чтение)</a>
+<!-- Анимированные фоновые элементы -->
+<div class="bg-bubble bg-bubble-1"></div>
+<div class="bg-bubble bg-bubble-2"></div>
+<div class="bg-bubble bg-bubble-3"></div>
+
+<div class="container">
+    <!-- Заголовок -->
+    <div class="header">
+        <h1>🎮 Игры для Глеба</h1>
+        <div class="subtitle">Учимся играя вместе с семьёй!</div>
+        <div class="stars">⭐ 🌟 ⭐</div>
+    </div>
+
+    <!-- Сетка игр -->
+    <div class="games-grid">
+        <!-- Карточка математической игры -->
+        <a href="math-game" class="game-card">
+            <div class="level-badge">Уровень 1-8</div>
+            <div class="game-icon">
+                ➕
+            </div>
+            <div class="game-title">
+                Состав числа
+            </div>
+            <div class="game-description">
+                Учимся складывать числа<br>
+                и находить пропущенные слагаемые
+            </div>
+            <div class="game-progress">
+                <div class="progress-fill" style="width: 0%;" id="mathProgress"></div>
+            </div>
+            <div style="font-size: 20px; margin-top: 5px;">
+                👶 👨 👩 👴 👵
+            </div>
+        </a>
+
+        <!-- Карточка игры со слогами -->
+        <a href="read-game" class="game-card">
+            <div class="level-badge">Уровень 1-8</div>
+            <div class="game-icon">
+                📖
+            </div>
+            <div class="game-title">
+                Учим слоги
+            </div>
+            <div class="game-description">
+                Знакомимся со слогами<br>
+                и учимся читать
+            </div>
+            <div class="game-progress">
+                <div class="progress-fill" style="width: 0%;" id="readProgress"></div>
+            </div>
+            <div style="font-size: 20px; margin-top: 5px;">
+                🐱 🐕 👧 🧒 👦
+            </div>
+        </a>
+    </div>
+
+    <!-- Нижняя часть с информацией -->
+    <div class="footer">
+        <div class="characters">
+            👨 👩 👧 👦 👴 👵 🐱 🐕
+        </div>
+        <div>
+            Твои любимые персонажи помогут в обучении!
+        </div>
+        <div style="margin-top: 15px;">
+            © 2025 · Для самых маленьких
+        </div>
+    </div>
+</div>
+
+<!-- Скрипт для загрузки прогресса (опционально) -->
+<script>
+    // Функция для загрузки прогресса из localStorage
+    function loadProgress() {
+        try {
+            // Прогресс математической игры
+            const mathState = localStorage.getItem('mathGameState');
+            if (mathState) {
+                const parsed = JSON.parse(mathState);
+                const mathProgress = document.getElementById('mathProgress');
+                if (parsed.currentNum) {
+                    const percent = ((parsed.currentNum - 2) / 8) * 100;
+                    mathProgress.style.width = Math.min(percent, 100) + '%';
+                }
+            }
+
+            // Прогресс игры со слогами
+            const readState = localStorage.getItem('syllableGameState');
+            if (readState) {
+                const parsed = JSON.parse(readState);
+                const readProgress = document.getElementById('readProgress');
+                if (parsed.currentLevel) {
+                    const percent = ((parsed.currentLevel - 1) / 7) * 100;
+                    readProgress.style.width = Math.min(percent, 100) + '%';
+                }
+            }
+        } catch (e) {
+            console.log('No progress data');
+        }
+    }
+
+    // Загружаем прогресс после загрузки страницы
+    window.addEventListener('load', loadProgress);
+</script>
 </body>
 </html>
