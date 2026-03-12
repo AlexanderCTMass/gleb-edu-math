@@ -1,7 +1,23 @@
 // ========== ГЛАВНЫЙ ФАЙЛ МАТЕМАТИЧЕСКОЙ ИГРЫ ==========
 $(document).ready(function() {
+    console.log('Main.js started');
+
+    // Даем время на инициализацию всех сервисов
+    setTimeout(() => {
+        checkRequiredServices();
+    }, 100);
+
     // Проверяем наличие всех необходимых сервисов
-    checkRequiredServices();
+    function checkRequiredServices() {
+        const required = ['GameState', 'HouseManager', 'UIManager', 'CharacterManager'];
+        const missing = required.filter(service => typeof window[service] === 'undefined');
+
+        if (missing.length > 0) {
+            console.warn('Missing services:', missing);
+        } else {
+            console.log('All required services loaded');
+        }
+    }
 
     // Проверяем, какой браузер используется
     const isYandexBrowser = /YaBrowser/i.test(navigator.userAgent);
@@ -31,16 +47,9 @@ $(document).ready(function() {
         }
     );
 
-    function checkRequiredServices() {
-        const required = ['GameState', 'HouseManager', 'UIManager', 'CharacterManager'];
-        const missing = required.filter(service => typeof window[service] === 'undefined');
-
-        if (missing.length > 0) {
-            console.error('Missing required services:', missing);
-        }
-    }
-
     function startGame() {
+        console.log('Starting game...');
+
         // Инициализация UI
         if (typeof UIManager !== 'undefined') {
             UIManager.init();
@@ -49,6 +58,8 @@ $(document).ready(function() {
         // Инициализация игровой логики
         if (typeof GameLogic !== 'undefined') {
             GameLogic.init();
+        } else {
+            console.error('GameLogic not available');
         }
 
         $('#gameWrapper').css('opacity', '1');
@@ -74,7 +85,9 @@ $(document).ready(function() {
                 MathVoiceService.getBrowserInfo() : { isYandexBrowser: false, hasYandexSpeaker: false };
 
             if (browserInfo.isYandexBrowser && browserInfo.hasYandexSpeaker) {
-                UIManager.showMessage('Алиса готова помогать! 🎤', '#4caf50');
+                if (typeof UIManager !== 'undefined') {
+                    UIManager.showMessage('Алиса готова помогать! 🎤', '#4caf50');
+                }
                 $('#voiceIcon').text('🎤');
             }
 
@@ -134,7 +147,10 @@ $(document).ready(function() {
     });
 
     $('#speakButton').click(function() {
-        if (typeof MathVoiceService === 'undefined') return;
+        if (typeof MathVoiceService === 'undefined') {
+            console.log('Voice service not available');
+            return;
+        }
 
         if ($(this).hasClass('speaking')) {
             MathVoiceService.stopSpeaking();

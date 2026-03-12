@@ -31,8 +31,10 @@ const GameLogic = (function () {
         $('#current-number').text(number);
 
         // Сбрасываем счетчики для нового числа
-        if (typeof MathVoiceService !== 'undefined') {
+        if (typeof MathVoiceService !== 'undefined' && MathVoiceService.resetCounters) {
             MathVoiceService.resetCounters();
+        } else {
+            console.log('Voice service not available, skipping resetCounters');
         }
         correctAnswersCount = 0;
 
