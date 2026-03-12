@@ -60,42 +60,56 @@
 
   <!-- Основной контент -->
   <div class="main-content">
-    <!-- РЕЖИМ ОБУЧЕНИЯ -->
-    <div class="learning-mode" id="learningMode">
-      <div class="syllable-card" id="syllableCard">
-        <div class="syllable-display" id="current-syllable">А</div>
-        <button class="speak-button" id="speakSyllableBtn">
-          <span class="speak-icon">🔊</span>
+    <!-- Режим обучения -->
+    <div id="learningMode" class="learning-mode">
+      <div class="syllable-display">
+        <div class="current-syllable" id="current-syllable">ма</div>
+        <button id="speakSyllableBtn" class="speak-btn">
+          <span class="icon">🔊</span>
         </button>
       </div>
-      <button class="next-syllable-btn" id="nextSyllableBtn">
+
+      <div class="word-example">
+        <div class="word-label">В слове:</div>
+        <div class="word-highlight" id="word-highlight">мама</div>
+      </div>
+
+      <div class="progress-info">
+        Слог <span id="syllable-count">1/5</span>
+      </div>
+
+      <button id="nextSyllableBtn" class="next-btn">
         Следующий слог →
       </button>
     </div>
 
-    <!-- РЕЖИМ ПРОВЕРКИ -->
-    <div class="testing-mode" id="testingMode" style="display: none;">
-      <div class="question-info">
-        <div class="progress-badge">
-          Вопросов: <span id="questions-progress">0/10</span>
-        </div>
-        <div class="wrong-badge">
-          Ошибок подряд: <span id="wrong-counter">0</span>/5
-        </div>
+    <!-- Режим тестирования -->
+    <div id="testingMode" class="testing-mode" style="display: none;">
+      <div class="question-word" id="word-with-blank">
+        <span class="word-part">ма</span>
+        <span class="word-part blank">___</span>
+        <span class="word-part">а</span>
       </div>
 
-      <div class="options-grid" id="optionsContainer">
-        <div class="option-btn" id="option1"></div>
-        <div class="option-btn" id="option2"></div>
-        <div class="option-btn" id="option3"></div>
-        <div class="option-btn" id="option4"></div>
+      <div class="options-container" id="optionsContainer">
+        <button id="option1" class="option-btn">ма</button>
+        <button id="option2" class="option-btn">па</button>
+        <button id="option3" class="option-btn">на</button>
+        <button id="option4" class="option-btn">ка</button>
       </div>
 
-      <button class="repeat-question-btn" id="repeatQuestionBtn">
-        <span class="speak-icon">🔊</span> Повторить задание
-      </button>
+      <div class="testing-footer">
+        <button id="repeatQuestionBtn" class="repeat-btn">
+          <span class="icon">🔊</span> Повторить
+        </button>
+
+        <div class="testing-progress">
+          <span id="questions-progress">0/10</span>
+          <span class="wrong-counter-label">Ошибок подряд:</span>
+          <span id="wrong-counter">0</span>
+        </div>
+      </div>
     </div>
-  </div>
 
   <!-- Область для сообщений -->
   <div class="message-area" id="game-message"></div>
@@ -125,7 +139,7 @@
 <script src="js/data.js"></script>
 <script src="../commonJs/resourceManager.js"></script>
 <script src="js/syllableGameState.js"></script>
-<script src="../commonJs/yandexVoiceService.js"></script>
+<script src="../commonJs/coreVoiceService.js"></script>
 <script src="js/voiceService.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/characterManager.js"></script>

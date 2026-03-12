@@ -1,4 +1,4 @@
-// ========== ГЛАВНЫЙ ФАЙЛ ИНИЦИАЛИЗАЦИИ ==========
+// ========== ГЛАВНЫЙ ФАЙЛ МАТЕМАТИЧЕСКОЙ ИГРЫ ==========
 $(document).ready(function() {
     // Проверяем, какой браузер используется
     const isYandexBrowser = /YaBrowser/i.test(navigator.userAgent);
@@ -28,26 +28,15 @@ $(document).ready(function() {
         $('#gameWrapper').css('opacity', '1');
         CharacterManager.startRandomTimer();
 
-        VoiceService.registerGame('mathGame', {
-            getVoiceEnabled: () => GameState.getProp('voiceEnabled'),
-            setVoiceEnabled: (enabled) => GameState.update('voiceEnabled', enabled),
-            getAutoVoiceEnabled: () => GameState.getProp('autoVoice'),
-            setAutoVoiceEnabled: (enabled) => GameState.update('autoVoice', enabled),
-            onStartSpeaking: () => $('#speakButton').addClass('speaking'),
-            onStopSpeaking: () => $('#speakButton').removeClass('speaking')
-        });
-
-// Переключаемся на математическую игру
-        VoiceService.setCurrentGame('mathGame');
         // Проверяем поддержку озвучки
-        if (!VoiceService.isSupported()) {
+        if (!MathVoiceService.isSupported()) {
             console.log('No speech support');
             $('#speakButton').hide();
             $('#voiceToggleBtn').hide();
             $('#autoVoiceToggleBtn').hide();
         } else {
             // Показываем информацию об используемом голосе
-            const browserInfo = VoiceService.getBrowserInfo();
+            const browserInfo = MathVoiceService.getBrowserInfo();
             if (browserInfo.isYandexBrowser && browserInfo.hasYandexSpeaker) {
                 UIManager.showMessage('Алиса готова помогать! 🎤', '#4caf50');
                 $('#voiceIcon').text('🎤');
@@ -55,12 +44,21 @@ $(document).ready(function() {
 
             updateVoiceButtons();
         }
+
+        // Подписываемся на изменения состояния
+        GameState.subscribe((state) => {
+            if (state.currentLevel !== 0) {
+                // Не останавливаем автоматически, только если нужно
+                // MathVoiceService.stopSpeaking();
+            }
+            updateVoiceButtons();
+        });
     }
 
     // Обновление состояния кнопок озвучки
     function updateVoiceButtons() {
         const state = GameState.get();
-        const browserInfo = VoiceService.getBrowserInfo();
+        const browserInfo = MathVoiceService.getBrowserInfo();
 
         // Кнопка вкл/выкл озвучки
         if (state.voiceEnabled) {
@@ -97,21 +95,26 @@ $(document).ready(function() {
 
     $('#speakButton').click(function() {
         if ($(this).hasClass('speaking')) {
-            VoiceService.stopSpeaking();
+            MathVoiceService.stopSpeaking();
             $(this).removeClass('speaking');
         } else {
             const state = GameState.get();
             if (state.currentLevel === 0) {
-                VoiceService.speakNumberComposition(state.currentNum, state.floors);
+                MathVoiceService.speakNumberComposition(state.currentNum, state.floors);
+            } else {
+                GameLogic.speakCurrentQuestion();
             }
         }
     });
 
     $('#voiceToggleBtn').click(function() {
-        const newState = GameState.toggleVoice();
+        const newState = MathVoiceService.toggleVoice();
+
+        // Синхронизируем с GameState
+        GameState.update('voiceEnabled', newState);
 
         if (!newState) {
-            VoiceService.stopSpeaking();
+            MathVoiceService.stopSpeaking();
         }
 
         updateVoiceButtons();
@@ -122,7 +125,11 @@ $(document).ready(function() {
     });
 
     $('#autoVoiceToggleBtn').click(function() {
-        const newState = GameState.toggleAutoVoice();
+        const newState = MathVoiceService.toggleAutoVoice();
+
+        // Синхронизируем с GameState
+        GameState.update('autoVoice', newState);
+
         updateVoiceButtons();
         UIManager.showMessage(
             newState ? 'Автоозвучка включена' : 'Автоозвучка выключена',
@@ -147,8 +154,8 @@ $(document).ready(function() {
         $('#resetModal').fadeOut(200);
 
         UIManager.showMessage('Игра начинается сначала!', '#ffd700');
-        VoiceService.stopSpeaking();
-        VoiceService.resetCounters();
+        MathVoiceService.stopSpeaking();
+        MathVoiceService.resetCounters();
         GameState.resetGame();
         CharacterManager.resetHistory();
         updateVoiceButtons();
@@ -161,10 +168,9 @@ $(document).ready(function() {
         }
     });
 
-    GameState.subscribe((state) => {
-        if (state.currentLevel !== 0) {
-            VoiceService.stopSpeaking();
-        }
-        updateVoiceButtons();
+    // Обработка переключения вкладок/страниц
+    $(window).on('blur', function() {
+        // При уходе со страницы останавливаем озвучку
+        MathVoiceService.stopSpeaking();
     });
 });

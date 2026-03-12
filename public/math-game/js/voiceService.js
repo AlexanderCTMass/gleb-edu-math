@@ -1,187 +1,153 @@
-
 // ========== СЕРВИС ДЛЯ МАТЕМАТИЧЕСКОЙ ИГРЫ ==========
 const MathVoiceService = (function() {
-    // Счетчики для разнообразия
-    let questionCounter = 0;
-    let correctCounter = 0;
-    let wrongCounter = 0;
+    // Создаем экземпляр базового сервиса
+    const base = BaseVoiceService.create('mathGame', {
+        // Получение состояний
+        getState: (prop) => {
+            if (typeof GameState !== 'undefined') {
+                return GameState.getProp(prop);
+            }
+            return null;
+        },
+        setState: (prop, value) => {
+            if (typeof GameState !== 'undefined') {
+                GameState.update(prop, value);
+            }
+        },
 
-    // Получение состояния автоозвучки из игры
-    function getAutoVoiceState() {
-        if (typeof SyllableGameState !== 'undefined' && SyllableGameState.get) {
-            return SyllableGameState.getProp('autoVoice');
-        }
-        if (typeof GameState !== 'undefined' && GameState.get) {
-            return GameState.getProp('autoVoice');
-        }
-        return true;
-    }
+        // Автоозвучка
+        getAutoVoice: () => {
+            return typeof GameState !== 'undefined' ?
+                GameState.getProp('autoVoice') : true;
+        },
+        setAutoVoice: (value) => {
+            if (typeof GameState !== 'undefined') {
+                GameState.update('autoVoice', value);
+            }
+        },
 
-    function setAutoVoiceState(enabled) {
-        if (typeof SyllableGameState !== 'undefined' && SyllableGameState.get) {
-            SyllableGameState.update('autoVoice', enabled);
+        // Колбэки для UI
+        onStartSpeaking: () => {
+            $('#speakButton').addClass('speaking');
+        },
+        onStopSpeaking: () => {
+            $('#speakButton').removeClass('speaking');
         }
-        if (typeof GameState !== 'undefined' && GameState.get) {
-            GameState.update('autoVoice', enabled);
-        }
-    }
+    });
 
-    function toggleAutoVoice() {
-        const newState = !getAutoVoiceState();
-        setAutoVoiceState(newState);
-        return newState;
-    }
-
-    // ========== МЕТОДЫ ДЛЯ МАТЕМАТИЧЕСКОЙ ИГРЫ ==========
+    // ========== СПЕЦИАЛИЗИРОВАННЫЕ МЕТОДЫ ==========
 
     function speakQuestion(number, left, right, unknownSide) {
-        if (!VoiceCoreService.isVoiceEnabled()) return false;
+        if (!base.isVoiceEnabled()) return false;
 
-        questionCounter++;
+        const counters = base._getCounters();
+        counters.question++;
+
         let text = '';
+        const variants = getQuestionVariants(number, left, right, unknownSide);
+        text = variants[counters.question % variants.length];
 
+        return base.queueSpeech(text, { rate: 0.9 });
+    }
+
+    function speakCorrectAnswer(number, left, right, unknownSide) {
+        if (!base.isVoiceEnabled()) return false;
+
+        const counters = base._getCounters();
+        counters.correct++;
+
+        const praises = ['Верно!', 'Правильно!', 'Молодец!', 'Отлично!', 'Здорово!', 'Супер!'];
+        const praise = praises[counters.correct % praises.length];
+
+        let text = '';
+        const variants = getCorrectVariants(praise, number, left, right, unknownSide);
+        text = variants[counters.correct % variants.length];
+
+        return base.queueSpeech(text);
+    }
+
+    function speakNumberComposition(number, floors) {
+        if (!base.isVoiceEnabled()) return false;
+
+        let text = `Число ${number} можно получить разными способами. `;
+        const variants = floors.map(floor => `${floor.left} и ${floor.right}`).join(', ');
+        text += variants + '. Давай попробуем решить примеры!';
+
+        return base.queueSpeech(text, { rate: 0.9 });
+    }
+
+    // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+
+    function getQuestionVariants(number, left, right, unknownSide) {
         if (unknownSide === 'left') {
-            const variants = [
+            return [
                 `Смотри, тут число ${number}. Мы знаем, что одно слагаемое - ${right}. Какое второе?`,
                 `Если к числу ${right} добавить какое-то число, получится ${number}. Что это за число?`,
                 `${right} плюс сколько будет ${number}?`,
                 `Найди недостающее число: ${right} + ? = ${number}`,
                 `Какое число нужно прибавить к ${right}, чтобы получить ${number}?`
             ];
-            text = variants[questionCounter % variants.length];
         } else if (unknownSide === 'right') {
-            const variants = [
+            return [
                 `Смотри, тут число ${number}. Мы знаем, что одно слагаемое - ${left}. Какое второе?`,
                 `Если к числу ${left} добавить какое-то число, получится ${number}. Что это за число?`,
                 `${left} плюс сколько будет ${number}?`,
                 `Найди недостающее число: ${left} + ? = ${number}`,
                 `Какое число нужно прибавить к ${left}, чтобы получить ${number}?`
             ];
-            text = variants[questionCounter % variants.length];
-        } else if (unknownSide === 'result') {
-            const variants = [
+        } else {
+            return [
                 `Сколько будет ${left} плюс ${right}?`,
                 `Посчитай: ${left} + ${right} = ?`,
                 `Если сложить ${left} и ${right}, сколько получится?`,
                 `${left} да ${right} - это сколько вместе?`,
                 `Найди сумму чисел ${left} и ${right}`
             ];
-            text = variants[questionCounter % variants.length];
         }
-
-        return VoiceCoreService.queueSpeech(text, { rate: 0.9 });
     }
 
-    function speakCorrectAnswer(number, left, right, unknownSide) {
-        if (!VoiceCoreService.isVoiceEnabled()) return false;
-
-        correctCounter++;
-        let text = '';
-
-        const praises = ['Верно!', 'Правильно!', 'Молодец!', 'Отлично!', 'Здорово!', 'Супер!'];
-        const praise = praises[correctCounter % praises.length];
-
+    function getCorrectVariants(praise, number, left, right, unknownSide) {
         if (unknownSide === 'left') {
-            const variants = [
+            return [
                 `${praise} ${number} - это ${right} и ${left}`,
                 `${praise} Чтобы получить ${number}, нужно к ${right} прибавить ${left}`,
                 `${praise} ${right} плюс ${left} как раз будет ${number}`
             ];
-            text = variants[correctCounter % variants.length];
         } else if (unknownSide === 'right') {
-            const variants = [
+            return [
                 `${praise} ${number} - это ${left} и ${right}`,
                 `${praise} Чтобы получить ${number}, нужно к ${left} прибавить ${right}`,
                 `${praise} ${left} плюс ${right} как раз будет ${number}`
             ];
-            text = variants[correctCounter % variants.length];
-        } else if (unknownSide === 'result') {
-            const variants = [
+        } else {
+            return [
                 `${praise} ${left} плюс ${right} равно ${number}`,
                 `${praise} Сумма чисел ${left} и ${right} - это ${number}`,
                 `${praise} ${left} + ${right} = ${number}`
             ];
-            text = variants[correctCounter % variants.length];
         }
-
-        return VoiceCoreService.queueSpeech(text);
     }
 
-    function speakNumberComposition(number, floors) {
-        if (!VoiceCoreService.isVoiceEnabled()) return false;
-
-        let text = `Число ${number} можно получить разными способами. `;
-
-        const variants = floors.map(floor => `${floor.left} и ${floor.right}`).join(', ');
-        text += variants + '. ';
-
-        text += 'Давай попробуем решить примеры!';
-
-        return VoiceCoreService.queueSpeech(text, {
-            rate: 0.9,
-            onStart: () => {
-                const $speakButton = $('#speakButton');
-                if ($speakButton.length) $speakButton.addClass('speaking');
-            },
-            onEnd: () => {
-                const $speakButton = $('#speakButton');
-                if ($speakButton.length) $speakButton.removeClass('speaking');
-            }
-        });
-    }
-
-    function speakCorrect() {
-        if (!VoiceCoreService.isVoiceEnabled()) return false;
-
-        correctCounter++;
-
-        const praises = ['Верно!', 'Правильно!', 'Молодец!', 'Отлично!', 'Здорово!', 'Супер!'];
-        const text = praises[correctCounter % praises.length];
-
-        return VoiceCoreService.queueSpeech(text);
-    }
-
-    function speakWrong() {
-        if (!VoiceCoreService.isVoiceEnabled()) return false;
-
-        wrongCounter++;
-
-        const texts = [
-            'Попробуй ещё раз!',
-            'Не получается? Давай подумаем вместе',
-            'Почти, попробуй другой вариант',
-            'Не угадал. Попробуй снова',
-            'Не верно. Давай попробуем другую цифру'
-        ];
-
-        const text = texts[wrongCounter % texts.length];
-        return VoiceCoreService.queueSpeech(text);
-    }
-
-    function resetCounters() {
-        questionCounter = 0;
-        correctCounter = 0;
-        wrongCounter = 0;
-    }
+    // ========== ПУБЛИЧНЫЙ API ==========
 
     return {
-        // Основные методы для математической игры
+        // Базовые методы
+        ...base,
+
+        // Специализированные методы
         speakQuestion,
         speakCorrectAnswer,
         speakNumberComposition,
-        speakCorrect,
-        speakWrong,
 
-        // Управление
-        toggleAutoVoice,
-        getAutoVoiceState,
-        resetCounters,
+        // Алиасы для обратной совместимости
+        speakCorrect: base.speakCorrect,
+        speakWrong: base.speakWrong,
 
-        // Делегированные методы из ядра
-        stopSpeaking: VoiceCoreService.stopSpeaking,
-        isVoiceEnabled: VoiceCoreService.isVoiceEnabled,
-        toggleVoice: VoiceCoreService.toggleVoice,
-        onQueueComplete: VoiceCoreService.onQueueComplete
+        // Переопределяем методы, если нужно
+        resetCounters: () => {
+            base.resetCounters();
+            // Дополнительная логика для математической игры
+        }
     };
 })();
 

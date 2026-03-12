@@ -30,29 +30,23 @@ $(document).ready(function() {
         SyllableGameLogic.init();
         CharacterManager.startRandomTimer();
 
-        VoiceService.registerGame('syllableGame', {
-            getVoiceEnabled: () => SyllableGameState.getProp('voiceEnabled'),
-            setVoiceEnabled: (enabled) => SyllableGameState.update('voiceEnabled', enabled),
-            getAutoVoiceEnabled: () => SyllableGameState.getProp('autoVoice'),
-            setAutoVoiceEnabled: (enabled) => SyllableGameState.update('autoVoice', enabled),
-            onStartSpeaking: () => $('#syllableSpeakButton').addClass('speaking'),
-            onStopSpeaking: () => $('#syllableSpeakButton').removeClass('speaking')
-        });
-
-        // Переключаемся на слоговую игру
-        VoiceService.setCurrentGame('syllableGame');
-
         // Проверка поддержки озвучки
-        if (!VoiceService.isSupported()) {
+        if (!SyllableVoiceService.isSupported()) {
             $('#speakSyllableBtn, #repeatQuestionBtn, #voiceToggleBtn, #autoVoiceToggleBtn').hide();
         } else {
             updateVoiceButtons();
         }
+
+        // Подписываемся на изменения состояния
+        SyllableGameState.subscribe((state) => {
+            updateVoiceButtons();
+        });
     }
 
     function updateVoiceButtons() {
         const state = SyllableGameState.get();
 
+        // Кнопка вкл/выкл озвучки
         if (state.voiceEnabled) {
             $('#voiceToggleBtn').removeClass('disabled');
             $('#voiceIcon').text('🔊');
@@ -61,10 +55,13 @@ $(document).ready(function() {
             $('#voiceIcon').text('🔇');
         }
 
+        // Кнопка автоозвучки
         if (state.autoVoice) {
             $('#autoVoiceToggleBtn').addClass('active');
+            $('#autoVoiceIcon').text('🎤');
         } else {
             $('#autoVoiceToggleBtn').removeClass('active');
+            $('#autoVoiceIcon').text('🎤');
         }
     }
 
@@ -72,7 +69,12 @@ $(document).ready(function() {
 
     // Озвучка слога в обучении
     $('#speakSyllableBtn').click(function() {
-        SyllableGameLogic.speakCurrentSyllable();
+        if ($(this).hasClass('speaking')) {
+            SyllableVoiceService.stopSpeaking();
+            $(this).removeClass('speaking');
+        } else {
+            SyllableGameLogic.speakCurrentSyllable();
+        }
     });
 
     // Кнопка "Следующий слог"
@@ -95,8 +97,15 @@ $(document).ready(function() {
 
     // Кнопки управления озвучкой
     $('#voiceToggleBtn').click(function() {
-        const newState = SyllableGameState.toggleVoice();
-        if (!newState) VoiceService.stopSpeaking();
+        const newState = SyllableVoiceService.toggleVoice();
+
+        // Синхронизируем с SyllableGameState
+        SyllableGameState.update('voiceEnabled', newState);
+
+        if (!newState) {
+            SyllableVoiceService.stopSpeaking();
+        }
+
         updateVoiceButtons();
         UIManager.showMessage(
             newState ? 'Озвучка включена' : 'Озвучка выключена',
@@ -105,12 +114,20 @@ $(document).ready(function() {
     });
 
     $('#autoVoiceToggleBtn').click(function() {
-        const newState = SyllableGameState.toggleAutoVoice();
+        const newState = SyllableVoiceService.toggleAutoVoice();
+
+        // Синхронизируем с SyllableGameState
+        SyllableGameState.update('autoVoice', newState);
+
         updateVoiceButtons();
         UIManager.showMessage(
             newState ? 'Автоозвучка включена' : 'Автоозвучка выключена',
             newState ? '#4caf50' : '#ff9800'
         );
+
+        if (newState && SyllableGameState.getProp('currentMode') === 'testing') {
+            setTimeout(() => SyllableGameLogic.speakCurrentQuestion(), 300);
+        }
     });
 
     // Сброс игры
@@ -128,15 +145,17 @@ $(document).ready(function() {
         $('#resetModal').fadeOut(200);
 
         UIManager.showMessage('Игра начинается сначала!', '#ffd700');
-        VoiceService.stopSpeaking();
+        SyllableVoiceService.stopSpeaking();
+        SyllableVoiceService.resetCounters();
         CharacterManager.resetHistory();
         SyllableGameState.resetGame();
         updateVoiceButtons();
         SyllableGameLogic.init();
     });
 
-    // Подписка на изменения состояния
-    SyllableGameState.subscribe((state) => {
-        updateVoiceButtons();
+    // Обработка переключения вкладок/страниц
+    $(window).on('blur', function() {
+        // При уходе со страницы останавливаем озвучку
+        SyllableVoiceService.stopSpeaking();
     });
 });
